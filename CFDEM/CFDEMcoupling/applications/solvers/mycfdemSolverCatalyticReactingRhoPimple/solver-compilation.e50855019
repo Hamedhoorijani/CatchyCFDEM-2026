@@ -1,0 +1,12 @@
+could not open file mpi.h for source file mycfdemSolverCatalyticReactingRhoPimple.C due to No such file or directory
+could not open file math.h for source file mycfdemSolverCatalyticReactingRhoPimple.C due to No such file or directory
+In file included from /kyukon/home/apps/RHEL8/zen2-ib/software/OpenFOAM/8-foss-2020b/OpenFOAM-8/src/OpenFOAM/lnInclude/postProcess.H:105,
+                 from mycfdemSolverCatalyticReactingRhoPimple.C:54:
+./createFields.H: In function ‘int main(int, char**)’:
+./createFields.H:12:7: warning: variable ‘inertIndex’ set but not used [-Wunused-but-set-variable]
+   12 | label inertIndex = -1;
+      |       ^~~~~~~~~~
+In file included from mycfdemSolverCatalyticReactingRhoPimple.C:62:
+createFields.H:12:7: warning: variable ‘inertIndex’ set but not used [-Wunused-but-set-variable]
+   12 | label inertIndex = -1;
+      |       ^~~~~~~~~~
