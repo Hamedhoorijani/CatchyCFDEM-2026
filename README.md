@@ -1,5 +1,7 @@
 # README for catchyFOAM
-Laurien Vandewalle, August 2020
+Original: Laurien Vandewalle, August 2020
+
+This is an adapted version of the original catchyFOAM directory, authored by Florian Wéry. Up to date installation instructions to be written.
 
 ## About catchyFOAM
 catchyFOAM (CATCHY = CATalytic CHemistrY) provides a set of OpenFOAM libraries, solvers and utilities for problems involving heterogeneous catalytic chemistry.<br/><br/>
