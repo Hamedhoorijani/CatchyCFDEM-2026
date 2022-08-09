@@ -94,6 +94,8 @@ void Foam::chemistryGSReductionMethods::DRG<CompType, GThermoType, SThermoType>:
     const label li
 )
 {
+	
+	Info << "reduceMechanism called" << endl;
     scalarField c1(this->nSpecie_+2, 0.0);
 
     for(label i=0; i<this->nSpecie_; i++)

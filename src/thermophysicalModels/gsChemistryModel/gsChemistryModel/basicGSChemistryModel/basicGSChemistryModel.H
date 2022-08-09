@@ -250,6 +250,9 @@ public:
                 //- Set temperatures (e.g. from other phase)
                 virtual void setTemperature(const volScalarField& Tg) = 0;
 
+		//- Return species mu fields
+		virtual scalar mu(label i, scalar T, scalar p) = 0;
+
                 //- Get rate in one cell or for one particle,
                 //  given the conditions (Y, Ys, rho, T, p).
                 //  This function returns the reaction heat

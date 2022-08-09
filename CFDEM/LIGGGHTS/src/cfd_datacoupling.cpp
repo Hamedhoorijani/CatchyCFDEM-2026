@@ -52,6 +52,8 @@
 #include "fix_cfd_coupling.h"
 #include "pair_gran.h"
 
+#include <iostream>
+
 using namespace LAMMPS_NS;
 
 #define MAXLENGTH 30
@@ -109,7 +111,7 @@ void CfdDatacoupling::init()
 
 void CfdDatacoupling::grow_()
 {
-    nvalues_max_ +=10;
+    nvalues_max_ +=1;
     memory->grow(pullnames_,nvalues_max_,MAXLENGTH,"FixCfdCoupling:valnames");
     memory->grow(pulltypes_,nvalues_max_,MAXLENGTH,"FixCfdCoupling:valtypes");
     memory->grow(pushinvoked_,MAXLENGTH,"FixCfdCoupling:pushinvoked_");
@@ -223,7 +225,6 @@ void CfdDatacoupling::check_datatransfer()
 
 void CfdDatacoupling::add_pull_property(const char *name, const char *type)
 {
-    
     if(strlen(name) >= MAXLENGTH) error->all(FLERR,"Fix couple/cfd: Maximum string length for a variable exceeded");
     if(npull_ >= nvalues_max_) grow_();
 

@@ -312,6 +312,8 @@ Foam::StandardChemistryModel<ReactionThermo, ThermoType>::tc() const
     {
         forAll(rho, celli)
         {
+            if (!this->thermo().cellReacting(celli)) continue;
+
             const scalar rhoi = rho[celli];
             const scalar Ti = T[celli];
             const scalar pi = p[celli];
@@ -409,6 +411,8 @@ Foam::StandardChemistryModel<ReactionThermo, ThermoType>::calculateRR
 
     forAll(rho, celli)
     {
+        if (!this->thermo().cellReacting(celli)) continue;
+
         const scalar rhoi = rho[celli];
         const scalar Ti = T[celli];
         const scalar pi = p[celli];
@@ -464,6 +468,8 @@ void Foam::StandardChemistryModel<ReactionThermo, ThermoType>::calculate()
 
     forAll(rho, celli)
     {
+        if (!this->thermo().cellReacting(celli)) continue;
+
         const scalar rhoi = rho[celli];
         const scalar Ti = T[celli];
         const scalar pi = p[celli];
@@ -491,7 +497,6 @@ Foam::scalar Foam::StandardChemistryModel<ReactionThermo, ThermoType>::solve
     const DeltaTType& deltaT
 )
 {
-  Info << " calling solve function in chemistryModel" << endl;
     BasicChemistryModel<ReactionThermo>::correct();
 
     scalar deltaTMin = great;
@@ -511,6 +516,8 @@ Foam::scalar Foam::StandardChemistryModel<ReactionThermo, ThermoType>::solve
 
     forAll(rho, celli)
     {
+        if (!this->thermo().cellReacting(celli)) continue;
+
         scalar Ti = T[celli];
 
         if (Ti > Treact_)

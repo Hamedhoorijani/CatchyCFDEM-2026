@@ -219,5 +219,12 @@ resetTabulationResults()
     }
 }
 
+template<class ReactionThermo, class GThermoType, class SThermoType>
+Foam::scalar
+Foam::TDACGSChemistryModel<ReactionThermo, GThermoType, SThermoType>::mu(label i, scalar T, scalar p)
+{
+    return this->gasSpecieThermo_[i].mu(T, p);
+}
+
 
 // ************************************************************************* //

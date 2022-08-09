@@ -56,6 +56,7 @@ simpleCatalyticChemistry::simpleCatalyticChemistry
     nGasSpecie_(Yg_.size()),
     nSolidSpecie_(Ys_.size()),
     solidSpecies_(catThermoPtr_->composition().solidSpecies()),
+    gasSpecies_(catThermoPtr_->composition().species()),
     useFluidTemperature_(propsDict_.lookupOrDefault("useFluidTemperature", false)),
     RR_(nGasSpecie_),
     Qdot_
@@ -76,6 +77,8 @@ simpleCatalyticChemistry::simpleCatalyticChemistry
     ofPartRR_(nGasSpecie_),
     partCoverages_(NULL),
     ofPartCoverages_(nSolidSpecie_),
+    partGas_(NULL),
+    ofPartGas_(nGasSpecie_),
     partTempName_(propsDict_.lookupOrDefault<word>("partTempName", "Temp")),
     partTemp_(NULL),
     partQdot_(NULL),
@@ -85,8 +88,14 @@ simpleCatalyticChemistry::simpleCatalyticChemistry
     dcdt_(nGasSpecie_, 0.0),
     Yi_(nGasSpecie_, 0.0),
     Ysi_(nSolidSpecie_, 0.0),
-    ini_(propsDict_.lookupOrDefault("initialized", false))
+    ini_(propsDict_.lookupOrDefault("initialized", false)),
+    massTransfer_(false)
 {
+    if(sm.nrMassTransferModels() != 0)
+    {
+        massTransfer_ = true;
+    };
+
     allocateMyArrays();
 
     forAll(RR_, fieldi)
@@ -122,6 +131,10 @@ simpleCatalyticChemistry::simpleCatalyticChemistry
 
 simpleCatalyticChemistry::~simpleCatalyticChemistry()
 {
+    if(massTransfer_)
+    {
+        delete partGas_;
+    };
     delete partTemp_;
     delete partQdot_;
     delete partRR_;
@@ -142,6 +155,12 @@ void simpleCatalyticChemistry::allocateMyArrays() const
     particleCloud_.dataExchangeM().allocateArray(partCoverages_, initVal, 1);
     forAll(ofPartRR_, i) ofPartRR_[i].setSize(particleCloud_.numberOfParticles(), 0.0);
     forAll(ofPartCoverages_, i) ofPartCoverages_[i].setSize(particleCloud_.numberOfParticles(), Ys_[i][0]);
+
+    if(massTransfer_)
+    {
+        forAll(ofPartGas_, i) ofPartGas_[i].setSize(particleCloud_.numberOfParticles(), Ygs_[i][0]);
+        particleCloud_.dataExchangeM().allocateArray(partGas_, initVal, 1);
+    };
     
     if (useParticleQdot_) particleCloud_.dataExchangeM().giveData(partHeatSourceName_, "scalar-atom", partHeatSource_);
 }
@@ -199,6 +218,17 @@ void simpleCatalyticChemistry::execute()
                 ofPartCoverages_[i][index] = partCoverages_[index][0];
             }
         }
+        if(massTransfer_)
+        {
+            forAll(ofPartGas_, i)
+            {
+                particleCloud_.dataExchangeM().getData(gasSpecies_[i], "scalar-atom", partGas_);
+            forAll(ofPartGas_[i], index)
+            {
+                ofPartGas_[i][index] = partGas_[index][0];
+            }
+        } 
+        };
     }
 
     if (!useFluidTemperature_)
@@ -211,10 +241,15 @@ void simpleCatalyticChemistry::execute()
         label cellI = particleCloud_.cellIDs()[index][0];
         if(cellI >= 0)
         {
-            for (label i=0; i<nGasSpecie_; i++) Yi_[i] = Ygs_[i][cellI];
+            if(!massTransfer_)
+            {
+                for (label i=0; i<nGasSpecie_; i++) Yi_[i] = Ygs_[i][cellI];
+            }
+            else
+            {
+                for (label i=0; i<nGasSpecie_; i++) Yi_[i] = ofPartGas_[i][index];
+            };
             for (label i=0; i<nSolidSpecie_; i++) Ysi_[i] = ofPartCoverages_[i][index];
-
-	//Info << "Ysi: " << Ysi_ << endl;
 
             if (useFluidTemperature_)
             {
@@ -333,6 +368,18 @@ void simpleCatalyticChemistry::postFlow()
         }
         particleCloud_.dataExchangeM().giveData(solidSpecies_[i], "scalar-atom", partCoverages_);
     }
+
+    if(massTransfer_)
+    {
+        forAll(ofPartGas_, i)
+        {
+            forAll(ofPartGas_[i], index)
+            {
+                partGas_[index][0] = particleCloud_.cellIDs()[index][0] >= 0 ? ofPartGas_[i][index] : 0.0;
+            }
+            particleCloud_.dataExchangeM().giveData(gasSpecies_[i], "scalar-atom", partGas_);
+        }
+    };
 
     if (useParticleQdot_)
     {

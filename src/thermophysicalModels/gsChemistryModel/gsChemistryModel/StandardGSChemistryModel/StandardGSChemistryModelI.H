@@ -208,5 +208,11 @@ Foam::StandardGSChemistryModel<ReactionThermo, GThermoType, SThermoType>::RR
     //return RRg_[i];
 }
 
+template<class ReactionThermo, class GThermoType, class SThermoType>
+Foam::scalar
+Foam::StandardGSChemistryModel<ReactionThermo, GThermoType, SThermoType>::mu(label i, scalar T, scalar p)
+{
+    return gasSpecieThermo_[i].mu(T, p);
+}
 
 // ************************************************************************* //

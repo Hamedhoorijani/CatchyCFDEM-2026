@@ -42,6 +42,7 @@ namespace Foam
 
 // forward declarations
 class energyModel;
+class massTransferModel;
 class thermCondModel;
 class catalyticChemistryModel;
 
@@ -57,11 +58,15 @@ protected:
 
     const wordList energyModels_;
 
+    const wordList massTransferModels_;
+
     bool implicitEnergyModel_;
 
     const wordList catalyticChemistryModels_;
 
     PtrList<energyModel> energyModel_;
+
+    PtrList<massTransferModel> massTransferModel_;
 
     autoPtr<thermCondModel> thermCondModel_;
 
@@ -69,11 +74,15 @@ protected:
 
     void calcEnergyContributions();
 
+    void calcMassTransferContributions();
+
     void speciesExecute();
 
 public:
 
     friend class energyModel;
+
+    friend class massTransferModel;
 
     friend class catalyticChemistryModel;
 
@@ -99,11 +108,15 @@ public:
 
        const energyModel& energyM(int);
 
+       const massTransferModel& massTransferM(int);
+
        const thermCondModel& thermCondM();
 
        const catalyticChemistryModel& catalyticChemistryM(int);
 
        label nrEnergyModels() const;
+
+       label nrMassTransferModels() const;
 
        bool implicitEnergyModel() const;
 
@@ -111,11 +124,15 @@ public:
 
        inline const wordList& energyModels() const;
 
+       inline const wordList& massTransferModels() const;
+
        inline const wordList& catalyticChemistryModels() const;
 
        void energyContributions(volScalarField&);
 
        void energyCoefficients(volScalarField&);
+
+       void massTransferContributions(volScalarField&, label);
 
        tmp<volScalarField> catalyticReactionRate(label i);
 

@@ -201,7 +201,6 @@ void gradPForce::setForce() const
             forceSubM(0).partToArray(index,force,vector::zero);
         //}
     }
-                    Info << "gradP done" << endl;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

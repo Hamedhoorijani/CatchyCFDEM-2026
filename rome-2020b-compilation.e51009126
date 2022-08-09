@@ -1,0 +1,12 @@
+cp: cannot stat '/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/CFDEMcoupling/src/LIGGGHTSpatch/*': No such file or directory
+CMake Deprecation Warning at /apps/gent/RHEL8/zen2-ib/software/VTK/9.0.1-foss-2020b/lib64/cmake/vtk-9.0/vtk-use-file-deprecated.cmake:1 (message):
+  The `VTK_USE_FILE` is no longer used starting with 8.90.
+Call Stack (most recent call first):
+  CMakeLists.txt:68 (INCLUDE)
+
+
+rm: cannot remove '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/CFDEMcoupling/etc/log/log_compileCFDEMcoupling_phaseCompressible': No such file or directory
+rm: cannot remove '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/CFDEMcoupling/etc/log/log_compileCFDEMcoupling_phaseCompressible': No such file or directory
+rm: cannot remove '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/CFDEMcoupling/etc/log/log_compileCFDEMcoupling_cfdemParticleComp': No such file or directory
+rm: cannot remove '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/CFDEMcoupling/etc/log/log_compileCFDEMcoupling_finiteVolume': No such file or directory
+rm: cannot remove 'log/log_compile_results_fail': No such file or directory

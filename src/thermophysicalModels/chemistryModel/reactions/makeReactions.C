@@ -85,7 +85,8 @@ namespace Foam
     forPolynomials(makeIRNReactions, thirdBodyArrheniusReactionRate);
     
     forCommonGases(makeIRNReactions, pdepArrheniusReactionRate);
-
+    forCommonLiquids(makeIRNReactions, pdepArrheniusReactionRate);
+    forPolynomials(makeIRNReactions, pdepArrheniusReactionRate);
 
     // Irreversible/reversible reactions
 

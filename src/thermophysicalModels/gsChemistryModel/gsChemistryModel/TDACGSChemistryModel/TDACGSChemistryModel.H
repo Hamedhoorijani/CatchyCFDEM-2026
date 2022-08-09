@@ -318,6 +318,9 @@ public:
 
             inline void resetTabulationResults();
 
+	    //- Return species mu fields
+	    virtual scalar mu(label i, scalar T, scalar p);
+
             //- Correct catalytic wall fluxes
             void correctCatalyticWallFluxes
             (

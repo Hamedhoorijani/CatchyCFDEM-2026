@@ -49,6 +49,8 @@
 #include "lmptype.h"
 #include "pointers.h"
 
+#include <iostream>
+
 namespace LAMMPS_NS {
 
 class Memory : protected Pointers {

@@ -617,6 +617,7 @@ void Foam::TDACGSChemistryModel<ReactionThermo, GThermoType, SThermoType>::jacob
     scalarSquareMatrix& J
 ) const
 {
+	Info << "Jacobian called" << endl;
     const bool reduced = mechRed_->active();
 
     // If the mechanism reduction is active, the computed Jacobian
@@ -769,6 +770,7 @@ Foam::scalar Foam::TDACGSChemistryModel<ReactionThermo, GThermoType, SThermoType
     const DeltaTType& deltaT
 )
 {
+	Info << "solve function called" << endl;
     // Increment counter of time-step
     timeSteps_++;
 
@@ -807,6 +809,8 @@ Foam::scalar Foam::TDACGSChemistryModel<ReactionThermo, GThermoType, SThermoType
         this->initializeSurface();
     }
 
+    Info << "surface initialized" << endl;
+    
     const scalarField& T = this->thermo().T();
     const scalarField& p = this->thermo().p();
 
@@ -888,6 +892,9 @@ Foam::scalar Foam::TDACGSChemistryModel<ReactionThermo, GThermoType, SThermoType
         // (it will either expand the current data or add a new stored point).
         else
         {
+			
+			Info << "entering else loop" << endl;
+			
             // Reset the time
             clockTime_.timeIncrement();
 
@@ -1588,6 +1595,7 @@ getRatesQdotI
             if (reduced)
             {
                 // Reduce mechanism change the number of species (only active)
+                Info << "Calling reduceMech" << endl;
                 mechRed_->reduceMechanism(p, Ts, c, celli);
 
                 nActiveSpecies += mechRed_->NsSimp();

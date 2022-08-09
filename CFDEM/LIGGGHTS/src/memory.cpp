@@ -85,12 +85,14 @@ void *Memory::smalloc(bigint nbytes, const char *name)
 
 void *Memory::srealloc(void *ptr, bigint nbytes, const char *name)
 {
+
   if (nbytes == 0) {
     destroy(ptr);
     return NULL;
   }
 
   ptr = realloc(ptr,nbytes);
+  
   if (ptr == NULL) {
     char str[512];
     if(strcmp(name,"neigh:binhead") == 0)

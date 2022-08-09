@@ -21,6 +21,7 @@ probeModels = subModels/probeModel
 registryModels = subModels/registryModel
 absorptionEmissionModels = subModels/absorptionEmissionModels
 energyModels = subModels/energyModel
+massTransferModels = subModels/massTransferModel
 thermCondModels = subModels/thermCondModel
 catChemistryModels = subModels/catalyticChemistryModel
 
@@ -142,6 +143,10 @@ $(energyModels)/energyModel/energyModel.C
 $(energyModels)/energyModel/newEnergyModel.C
 $(energyModels)/heatTransferGunn/heatTransferGunn.C
 
+$(massTransferModels)/massTransferModel/massTransferModel.C
+$(massTransferModels)/massTransferModel/newMassTransferModel.C
+$(massTransferModels)/massTransferGunn/massTransferGunn.C
+
 $(thermCondModels)/thermCondModel/thermCondModel.C
 $(thermCondModels)/thermCondModel/newThermCondModel.C
 $(thermCondModels)/SyamlalThermCond/SyamlalThermCond.C
@@ -155,5 +160,8 @@ $(catChemistryModels)/noCatalyticChemistry/noCatalyticChemistry.C
 $(catChemistryModels)/simpleCatalyticChemistry/simpleCatalyticChemistry.C
 $(catChemistryModels)/PACatalyticChemistry/PACatalyticChemistry.C
 $(catChemistryModels)/pseudoHomCatalyticChemistry/pseudoHomCatalyticChemistry.C
+
+$(catChemistryModels)/simpleCatalyticChemistryV/simpleCatalyticChemistryV.C
+
 
 LIB = $(CFDEM_LIB_DIR)/lib$(CFDEM_LIB_NAME)

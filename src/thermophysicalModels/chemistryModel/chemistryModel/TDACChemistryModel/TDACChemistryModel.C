@@ -602,6 +602,7 @@ Foam::scalar Foam::TDACChemistryModel<ReactionThermo, ThermoType>::solve
 
     forAll(rho, celli)
     {
+        if (!this->thermo().cellReacting(celli)) continue;
         const scalar rhoi = rho[celli];
         scalar pi = p[celli];
         scalar Ti = T[celli];
@@ -668,7 +669,6 @@ Foam::scalar Foam::TDACChemistryModel<ReactionThermo, ThermoType>::solve
                     // completeC_ used in the overridden ODE methods
                     // to update only the active species
                     completeC_ = c;
-
 
                     // Solve the reduced set of ODE
                     this->solve

@@ -366,7 +366,7 @@ void PACatalyticChemistry::execute()
                 catChemistryPtr_->getRatesQdotI
                 (
                     particleCloud_.mesh().time().deltaTValue(),
-                    1, //celli?
+                    1,
                     dcdt_,
                     Yiav_[index],
                     Ysiav_[index],

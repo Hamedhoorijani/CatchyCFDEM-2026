@@ -85,6 +85,9 @@ private:
     //- Reference to surface species table
     const speciesTable solidSpecies_;
 
+    //- Reference to gas species table
+    const speciesTable gasSpecies_;
+
     //- Switch to use fluid temperature instead of particle temperature
     const bool useFluidTemperature_;
 
@@ -101,6 +104,10 @@ private:
     //- List of surface species coverages on particles
     mutable double **partCoverages_;
     mutable List<scalarList> ofPartCoverages_;
+
+    //- List of gas species concentrations in particles
+    mutable double **partGas_;
+    mutable List<scalarList> ofPartGas_;
 
     //- Particle temperature
     word partTempName_;
@@ -121,6 +128,9 @@ private:
 
     //- Initialization flag
     bool ini_;
+
+    //- Flag for diffusive mass transfer
+    bool massTransfer_;
 
     // Private Member Functions
 

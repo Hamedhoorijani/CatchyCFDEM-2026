@@ -1138,3 +1138,783 @@ gmake: *** [Makefile:140: cmTC_23eac/fast] Error 2
 
 
 
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_0f6f3/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_0f6f3.dir/build.make CMakeFiles/cmTC_0f6f3.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_0f6f3.dir/src.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCMAKE_HAVE_LIBC_PTHREAD -o CMakeFiles/cmTC_0f6f3.dir/src.c.o -c /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_0f6f3
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_0f6f3.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCMAKE_HAVE_LIBC_PTHREAD CMakeFiles/cmTC_0f6f3.dir/src.c.o -o cmTC_0f6f3 
+CMakeFiles/cmTC_0f6f3.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_create'
+CMakeFiles/cmTC_0f6f3.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_detach'
+CMakeFiles/cmTC_0f6f3.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_cancel'
+CMakeFiles/cmTC_0f6f3.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_join'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_0f6f3.dir/build.make:106: cmTC_0f6f3] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_0f6f3/fast] Error 2
+
+
+Source file was:
+#include <pthread.h>
+
+void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_2dd00/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_2dd00.dir/build.make CMakeFiles/cmTC_2dd00.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_2dd00.dir/CheckFunctionExists.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create -o CMakeFiles/cmTC_2dd00.dir/CheckFunctionExists.c.o -c /kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/share/cmake-3.18/Modules/CheckFunctionExists.c
+Linking C executable cmTC_2dd00
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_2dd00.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCHECK_FUNCTION_EXISTS=pthread_create CMakeFiles/cmTC_2dd00.dir/CheckFunctionExists.c.o -o cmTC_2dd00  -lpthreads 
+/apps/gent/RHEL8/zen2-ib/software/binutils/2.35-GCCcore-10.2.0/bin/ld.gold: error: cannot find -lpthreads
+CMakeFiles/cmTC_2dd00.dir/CheckFunctionExists.c.o:CheckFunctionExists.c:function main: error: undefined reference to 'pthread_create'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_2dd00.dir/build.make:106: cmTC_2dd00] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_2dd00/fast] Error 2
+
+
+
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_e2333/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_e2333.dir/build.make CMakeFiles/cmTC_e2333.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_e2333.dir/src.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCMAKE_HAVE_LIBC_PTHREAD -o CMakeFiles/cmTC_e2333.dir/src.c.o -c /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_e2333
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_e2333.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCMAKE_HAVE_LIBC_PTHREAD CMakeFiles/cmTC_e2333.dir/src.c.o -o cmTC_e2333 
+CMakeFiles/cmTC_e2333.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_create'
+CMakeFiles/cmTC_e2333.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_detach'
+CMakeFiles/cmTC_e2333.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_cancel'
+CMakeFiles/cmTC_e2333.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_join'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_e2333.dir/build.make:106: cmTC_e2333] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_e2333/fast] Error 2
+
+
+Source file was:
+#include <pthread.h>
+
+void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_f020b/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_f020b.dir/build.make CMakeFiles/cmTC_f020b.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_f020b.dir/CheckFunctionExists.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create -o CMakeFiles/cmTC_f020b.dir/CheckFunctionExists.c.o -c /kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/share/cmake-3.18/Modules/CheckFunctionExists.c
+Linking C executable cmTC_f020b
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_f020b.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCHECK_FUNCTION_EXISTS=pthread_create CMakeFiles/cmTC_f020b.dir/CheckFunctionExists.c.o -o cmTC_f020b  -lpthreads 
+/apps/gent/RHEL8/zen2-ib/software/binutils/2.35-GCCcore-10.2.0/bin/ld.gold: error: cannot find -lpthreads
+CMakeFiles/cmTC_f020b.dir/CheckFunctionExists.c.o:CheckFunctionExists.c:function main: error: undefined reference to 'pthread_create'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_f020b.dir/build.make:106: cmTC_f020b] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_f020b/fast] Error 2
+
+
+
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_5b796/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_5b796.dir/build.make CMakeFiles/cmTC_5b796.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_5b796.dir/src.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCMAKE_HAVE_LIBC_PTHREAD -o CMakeFiles/cmTC_5b796.dir/src.c.o -c /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_5b796
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_5b796.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCMAKE_HAVE_LIBC_PTHREAD CMakeFiles/cmTC_5b796.dir/src.c.o -o cmTC_5b796 
+CMakeFiles/cmTC_5b796.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_create'
+CMakeFiles/cmTC_5b796.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_detach'
+CMakeFiles/cmTC_5b796.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_cancel'
+CMakeFiles/cmTC_5b796.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_join'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_5b796.dir/build.make:106: cmTC_5b796] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_5b796/fast] Error 2
+
+
+Source file was:
+#include <pthread.h>
+
+void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_a4ab6/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_a4ab6.dir/build.make CMakeFiles/cmTC_a4ab6.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_a4ab6.dir/CheckFunctionExists.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create -o CMakeFiles/cmTC_a4ab6.dir/CheckFunctionExists.c.o -c /kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/share/cmake-3.18/Modules/CheckFunctionExists.c
+Linking C executable cmTC_a4ab6
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_a4ab6.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCHECK_FUNCTION_EXISTS=pthread_create CMakeFiles/cmTC_a4ab6.dir/CheckFunctionExists.c.o -o cmTC_a4ab6  -lpthreads 
+/apps/gent/RHEL8/zen2-ib/software/binutils/2.35-GCCcore-10.2.0/bin/ld.gold: error: cannot find -lpthreads
+CMakeFiles/cmTC_a4ab6.dir/CheckFunctionExists.c.o:CheckFunctionExists.c:function main: error: undefined reference to 'pthread_create'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_a4ab6.dir/build.make:106: cmTC_a4ab6] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_a4ab6/fast] Error 2
+
+
+
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_3c241/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_3c241.dir/build.make CMakeFiles/cmTC_3c241.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_3c241.dir/src.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCMAKE_HAVE_LIBC_PTHREAD -o CMakeFiles/cmTC_3c241.dir/src.c.o -c /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_3c241
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_3c241.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCMAKE_HAVE_LIBC_PTHREAD CMakeFiles/cmTC_3c241.dir/src.c.o -o cmTC_3c241 
+CMakeFiles/cmTC_3c241.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_create'
+CMakeFiles/cmTC_3c241.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_detach'
+CMakeFiles/cmTC_3c241.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_cancel'
+CMakeFiles/cmTC_3c241.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_join'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_3c241.dir/build.make:106: cmTC_3c241] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_3c241/fast] Error 2
+
+
+Source file was:
+#include <pthread.h>
+
+void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_24760/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_24760.dir/build.make CMakeFiles/cmTC_24760.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_24760.dir/CheckFunctionExists.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create -o CMakeFiles/cmTC_24760.dir/CheckFunctionExists.c.o -c /kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/share/cmake-3.18/Modules/CheckFunctionExists.c
+Linking C executable cmTC_24760
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_24760.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCHECK_FUNCTION_EXISTS=pthread_create CMakeFiles/cmTC_24760.dir/CheckFunctionExists.c.o -o cmTC_24760  -lpthreads 
+/apps/gent/RHEL8/zen2-ib/software/binutils/2.35-GCCcore-10.2.0/bin/ld.gold: error: cannot find -lpthreads
+CMakeFiles/cmTC_24760.dir/CheckFunctionExists.c.o:CheckFunctionExists.c:function main: error: undefined reference to 'pthread_create'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_24760.dir/build.make:106: cmTC_24760] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_24760/fast] Error 2
+
+
+
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_15166/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_15166.dir/build.make CMakeFiles/cmTC_15166.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_15166.dir/src.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCMAKE_HAVE_LIBC_PTHREAD -o CMakeFiles/cmTC_15166.dir/src.c.o -c /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_15166
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_15166.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCMAKE_HAVE_LIBC_PTHREAD CMakeFiles/cmTC_15166.dir/src.c.o -o cmTC_15166 
+CMakeFiles/cmTC_15166.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_create'
+CMakeFiles/cmTC_15166.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_detach'
+CMakeFiles/cmTC_15166.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_cancel'
+CMakeFiles/cmTC_15166.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_join'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_15166.dir/build.make:106: cmTC_15166] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_15166/fast] Error 2
+
+
+Source file was:
+#include <pthread.h>
+
+void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_e7e46/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_e7e46.dir/build.make CMakeFiles/cmTC_e7e46.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_e7e46.dir/CheckFunctionExists.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create -o CMakeFiles/cmTC_e7e46.dir/CheckFunctionExists.c.o -c /kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/share/cmake-3.18/Modules/CheckFunctionExists.c
+Linking C executable cmTC_e7e46
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_e7e46.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCHECK_FUNCTION_EXISTS=pthread_create CMakeFiles/cmTC_e7e46.dir/CheckFunctionExists.c.o -o cmTC_e7e46  -lpthreads 
+/apps/gent/RHEL8/zen2-ib/software/binutils/2.35-GCCcore-10.2.0/bin/ld.gold: error: cannot find -lpthreads
+CMakeFiles/cmTC_e7e46.dir/CheckFunctionExists.c.o:CheckFunctionExists.c:function main: error: undefined reference to 'pthread_create'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_e7e46.dir/build.make:106: cmTC_e7e46] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_e7e46/fast] Error 2
+
+
+
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_6cfe7/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_6cfe7.dir/build.make CMakeFiles/cmTC_6cfe7.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_6cfe7.dir/src.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCMAKE_HAVE_LIBC_PTHREAD -o CMakeFiles/cmTC_6cfe7.dir/src.c.o -c /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_6cfe7
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_6cfe7.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCMAKE_HAVE_LIBC_PTHREAD CMakeFiles/cmTC_6cfe7.dir/src.c.o -o cmTC_6cfe7 
+CMakeFiles/cmTC_6cfe7.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_create'
+CMakeFiles/cmTC_6cfe7.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_detach'
+CMakeFiles/cmTC_6cfe7.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_cancel'
+CMakeFiles/cmTC_6cfe7.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_join'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_6cfe7.dir/build.make:106: cmTC_6cfe7] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_6cfe7/fast] Error 2
+
+
+Source file was:
+#include <pthread.h>
+
+void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_0ce62/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_0ce62.dir/build.make CMakeFiles/cmTC_0ce62.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_0ce62.dir/CheckFunctionExists.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create -o CMakeFiles/cmTC_0ce62.dir/CheckFunctionExists.c.o -c /kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/share/cmake-3.18/Modules/CheckFunctionExists.c
+Linking C executable cmTC_0ce62
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_0ce62.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCHECK_FUNCTION_EXISTS=pthread_create CMakeFiles/cmTC_0ce62.dir/CheckFunctionExists.c.o -o cmTC_0ce62  -lpthreads 
+/apps/gent/RHEL8/zen2-ib/software/binutils/2.35-GCCcore-10.2.0/bin/ld.gold: error: cannot find -lpthreads
+CMakeFiles/cmTC_0ce62.dir/CheckFunctionExists.c.o:CheckFunctionExists.c:function main: error: undefined reference to 'pthread_create'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_0ce62.dir/build.make:106: cmTC_0ce62] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_0ce62/fast] Error 2
+
+
+
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_936a8/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_936a8.dir/build.make CMakeFiles/cmTC_936a8.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_936a8.dir/src.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCMAKE_HAVE_LIBC_PTHREAD -o CMakeFiles/cmTC_936a8.dir/src.c.o -c /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_936a8
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_936a8.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCMAKE_HAVE_LIBC_PTHREAD CMakeFiles/cmTC_936a8.dir/src.c.o -o cmTC_936a8 
+CMakeFiles/cmTC_936a8.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_create'
+CMakeFiles/cmTC_936a8.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_detach'
+CMakeFiles/cmTC_936a8.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_cancel'
+CMakeFiles/cmTC_936a8.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_join'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_936a8.dir/build.make:106: cmTC_936a8] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_936a8/fast] Error 2
+
+
+Source file was:
+#include <pthread.h>
+
+void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_d9429/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_d9429.dir/build.make CMakeFiles/cmTC_d9429.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_d9429.dir/CheckFunctionExists.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create -o CMakeFiles/cmTC_d9429.dir/CheckFunctionExists.c.o -c /kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/share/cmake-3.18/Modules/CheckFunctionExists.c
+Linking C executable cmTC_d9429
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_d9429.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCHECK_FUNCTION_EXISTS=pthread_create CMakeFiles/cmTC_d9429.dir/CheckFunctionExists.c.o -o cmTC_d9429  -lpthreads 
+/apps/gent/RHEL8/zen2-ib/software/binutils/2.35-GCCcore-10.2.0/bin/ld.gold: error: cannot find -lpthreads
+CMakeFiles/cmTC_d9429.dir/CheckFunctionExists.c.o:CheckFunctionExists.c:function main: error: undefined reference to 'pthread_create'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_d9429.dir/build.make:106: cmTC_d9429] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_d9429/fast] Error 2
+
+
+
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_0a113/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_0a113.dir/build.make CMakeFiles/cmTC_0a113.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_0a113.dir/src.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCMAKE_HAVE_LIBC_PTHREAD -o CMakeFiles/cmTC_0a113.dir/src.c.o -c /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_0a113
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_0a113.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCMAKE_HAVE_LIBC_PTHREAD CMakeFiles/cmTC_0a113.dir/src.c.o -o cmTC_0a113 
+CMakeFiles/cmTC_0a113.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_create'
+CMakeFiles/cmTC_0a113.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_detach'
+CMakeFiles/cmTC_0a113.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_cancel'
+CMakeFiles/cmTC_0a113.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_join'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_0a113.dir/build.make:106: cmTC_0a113] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_0a113/fast] Error 2
+
+
+Source file was:
+#include <pthread.h>
+
+void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_63e10/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_63e10.dir/build.make CMakeFiles/cmTC_63e10.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_63e10.dir/CheckFunctionExists.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create -o CMakeFiles/cmTC_63e10.dir/CheckFunctionExists.c.o -c /kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/share/cmake-3.18/Modules/CheckFunctionExists.c
+Linking C executable cmTC_63e10
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_63e10.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCHECK_FUNCTION_EXISTS=pthread_create CMakeFiles/cmTC_63e10.dir/CheckFunctionExists.c.o -o cmTC_63e10  -lpthreads 
+/apps/gent/RHEL8/zen2-ib/software/binutils/2.35-GCCcore-10.2.0/bin/ld.gold: error: cannot find -lpthreads
+CMakeFiles/cmTC_63e10.dir/CheckFunctionExists.c.o:CheckFunctionExists.c:function main: error: undefined reference to 'pthread_create'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_63e10.dir/build.make:106: cmTC_63e10] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_63e10/fast] Error 2
+
+
+
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_c71b0/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_c71b0.dir/build.make CMakeFiles/cmTC_c71b0.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_c71b0.dir/src.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCMAKE_HAVE_LIBC_PTHREAD -o CMakeFiles/cmTC_c71b0.dir/src.c.o -c /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_c71b0
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_c71b0.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCMAKE_HAVE_LIBC_PTHREAD CMakeFiles/cmTC_c71b0.dir/src.c.o -o cmTC_c71b0 
+CMakeFiles/cmTC_c71b0.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_create'
+CMakeFiles/cmTC_c71b0.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_detach'
+CMakeFiles/cmTC_c71b0.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_cancel'
+CMakeFiles/cmTC_c71b0.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_join'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_c71b0.dir/build.make:106: cmTC_c71b0] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_c71b0/fast] Error 2
+
+
+Source file was:
+#include <pthread.h>
+
+void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_1964b/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_1964b.dir/build.make CMakeFiles/cmTC_1964b.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_1964b.dir/CheckFunctionExists.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create -o CMakeFiles/cmTC_1964b.dir/CheckFunctionExists.c.o -c /kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/share/cmake-3.18/Modules/CheckFunctionExists.c
+Linking C executable cmTC_1964b
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_1964b.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCHECK_FUNCTION_EXISTS=pthread_create CMakeFiles/cmTC_1964b.dir/CheckFunctionExists.c.o -o cmTC_1964b  -lpthreads 
+/apps/gent/RHEL8/zen2-ib/software/binutils/2.35-GCCcore-10.2.0/bin/ld.gold: error: cannot find -lpthreads
+CMakeFiles/cmTC_1964b.dir/CheckFunctionExists.c.o:CheckFunctionExists.c:function main: error: undefined reference to 'pthread_create'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_1964b.dir/build.make:106: cmTC_1964b] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_1964b/fast] Error 2
+
+
+
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_a8789/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_a8789.dir/build.make CMakeFiles/cmTC_a8789.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_a8789.dir/src.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCMAKE_HAVE_LIBC_PTHREAD -o CMakeFiles/cmTC_a8789.dir/src.c.o -c /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_a8789
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_a8789.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCMAKE_HAVE_LIBC_PTHREAD CMakeFiles/cmTC_a8789.dir/src.c.o -o cmTC_a8789 
+CMakeFiles/cmTC_a8789.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_create'
+CMakeFiles/cmTC_a8789.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_detach'
+CMakeFiles/cmTC_a8789.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_cancel'
+CMakeFiles/cmTC_a8789.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_join'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_a8789.dir/build.make:106: cmTC_a8789] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_a8789/fast] Error 2
+
+
+Source file was:
+#include <pthread.h>
+
+void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_16b0d/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_16b0d.dir/build.make CMakeFiles/cmTC_16b0d.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_16b0d.dir/CheckFunctionExists.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create -o CMakeFiles/cmTC_16b0d.dir/CheckFunctionExists.c.o -c /kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/share/cmake-3.18/Modules/CheckFunctionExists.c
+Linking C executable cmTC_16b0d
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_16b0d.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCHECK_FUNCTION_EXISTS=pthread_create CMakeFiles/cmTC_16b0d.dir/CheckFunctionExists.c.o -o cmTC_16b0d  -lpthreads 
+/apps/gent/RHEL8/zen2-ib/software/binutils/2.35-GCCcore-10.2.0/bin/ld.gold: error: cannot find -lpthreads
+CMakeFiles/cmTC_16b0d.dir/CheckFunctionExists.c.o:CheckFunctionExists.c:function main: error: undefined reference to 'pthread_create'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_16b0d.dir/build.make:106: cmTC_16b0d] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_16b0d/fast] Error 2
+
+
+
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_02474/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_02474.dir/build.make CMakeFiles/cmTC_02474.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_02474.dir/src.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCMAKE_HAVE_LIBC_PTHREAD -o CMakeFiles/cmTC_02474.dir/src.c.o -c /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_02474
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_02474.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCMAKE_HAVE_LIBC_PTHREAD CMakeFiles/cmTC_02474.dir/src.c.o -o cmTC_02474 
+CMakeFiles/cmTC_02474.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_create'
+CMakeFiles/cmTC_02474.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_detach'
+CMakeFiles/cmTC_02474.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_cancel'
+CMakeFiles/cmTC_02474.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_join'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_02474.dir/build.make:106: cmTC_02474] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_02474/fast] Error 2
+
+
+Source file was:
+#include <pthread.h>
+
+void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_c8230/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_c8230.dir/build.make CMakeFiles/cmTC_c8230.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_c8230.dir/CheckFunctionExists.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create -o CMakeFiles/cmTC_c8230.dir/CheckFunctionExists.c.o -c /kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/share/cmake-3.18/Modules/CheckFunctionExists.c
+Linking C executable cmTC_c8230
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_c8230.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCHECK_FUNCTION_EXISTS=pthread_create CMakeFiles/cmTC_c8230.dir/CheckFunctionExists.c.o -o cmTC_c8230  -lpthreads 
+/apps/gent/RHEL8/zen2-ib/software/binutils/2.35-GCCcore-10.2.0/bin/ld.gold: error: cannot find -lpthreads
+CMakeFiles/cmTC_c8230.dir/CheckFunctionExists.c.o:CheckFunctionExists.c:function main: error: undefined reference to 'pthread_create'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_c8230.dir/build.make:106: cmTC_c8230] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_c8230/fast] Error 2
+
+
+
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_9fad5/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_9fad5.dir/build.make CMakeFiles/cmTC_9fad5.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_9fad5.dir/src.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCMAKE_HAVE_LIBC_PTHREAD -o CMakeFiles/cmTC_9fad5.dir/src.c.o -c /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_9fad5
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_9fad5.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCMAKE_HAVE_LIBC_PTHREAD CMakeFiles/cmTC_9fad5.dir/src.c.o -o cmTC_9fad5 
+CMakeFiles/cmTC_9fad5.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_create'
+CMakeFiles/cmTC_9fad5.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_detach'
+CMakeFiles/cmTC_9fad5.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_cancel'
+CMakeFiles/cmTC_9fad5.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_join'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_9fad5.dir/build.make:106: cmTC_9fad5] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_9fad5/fast] Error 2
+
+
+Source file was:
+#include <pthread.h>
+
+void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_e6eea/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_e6eea.dir/build.make CMakeFiles/cmTC_e6eea.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_e6eea.dir/CheckFunctionExists.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create -o CMakeFiles/cmTC_e6eea.dir/CheckFunctionExists.c.o -c /kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/share/cmake-3.18/Modules/CheckFunctionExists.c
+Linking C executable cmTC_e6eea
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_e6eea.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCHECK_FUNCTION_EXISTS=pthread_create CMakeFiles/cmTC_e6eea.dir/CheckFunctionExists.c.o -o cmTC_e6eea  -lpthreads 
+/apps/gent/RHEL8/zen2-ib/software/binutils/2.35-GCCcore-10.2.0/bin/ld.gold: error: cannot find -lpthreads
+CMakeFiles/cmTC_e6eea.dir/CheckFunctionExists.c.o:CheckFunctionExists.c:function main: error: undefined reference to 'pthread_create'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_e6eea.dir/build.make:106: cmTC_e6eea] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_e6eea/fast] Error 2
+
+
+
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_98833/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_98833.dir/build.make CMakeFiles/cmTC_98833.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_98833.dir/src.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCMAKE_HAVE_LIBC_PTHREAD -o CMakeFiles/cmTC_98833.dir/src.c.o -c /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_98833
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_98833.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCMAKE_HAVE_LIBC_PTHREAD CMakeFiles/cmTC_98833.dir/src.c.o -o cmTC_98833 
+CMakeFiles/cmTC_98833.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_create'
+CMakeFiles/cmTC_98833.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_detach'
+CMakeFiles/cmTC_98833.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_cancel'
+CMakeFiles/cmTC_98833.dir/src.c.o:src.c:function main: error: undefined reference to 'pthread_join'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_98833.dir/build.make:106: cmTC_98833] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_98833/fast] Error 2
+
+
+Source file was:
+#include <pthread.h>
+
+void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake cmTC_79154/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_79154.dir/build.make CMakeFiles/cmTC_79154.dir/build
+gmake[1]: Entering directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_79154.dir/CheckFunctionExists.c.o
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create -o CMakeFiles/cmTC_79154.dir/CheckFunctionExists.c.o -c /kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/share/cmake-3.18/Modules/CheckFunctionExists.c
+Linking C executable cmTC_79154
+/kyukon/home/apps/RHEL8/zen2-ib/software/CMake/3.18.4-GCCcore-10.2.0/bin/cmake -E cmake_link_script CMakeFiles/cmTC_79154.dir/link.txt --verbose=1
+/apps/gent/RHEL8/zen2-ib/software/GCCcore/10.2.0/bin/cc  -DCHECK_FUNCTION_EXISTS=pthread_create CMakeFiles/cmTC_79154.dir/CheckFunctionExists.c.o -o cmTC_79154  -lpthreads 
+/apps/gent/RHEL8/zen2-ib/software/binutils/2.35-GCCcore-10.2.0/bin/ld.gold: error: cannot find -lpthreads
+CMakeFiles/cmTC_79154.dir/CheckFunctionExists.c.o:CheckFunctionExists.c:function main: error: undefined reference to 'pthread_create'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_79154.dir/build.make:106: cmTC_79154] Error 1
+gmake[1]: Leaving directory '/kyukon/data/gent/426/vsc42684/catchyFOAM-rome-foss-2020b/CFDEM/LIGGGHTS/src-build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_79154/fast] Error 2
+
+
+

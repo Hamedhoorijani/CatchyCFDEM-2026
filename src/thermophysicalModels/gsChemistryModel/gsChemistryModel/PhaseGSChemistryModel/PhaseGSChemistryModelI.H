@@ -173,5 +173,12 @@ Foam::PhaseGSChemistryModel<ReactionThermo, GThermoType, SThermoType>::RR
     }
 }
 
+template<class ReactionThermo, class GThermoType, class SThermoType>
+Foam::scalar
+Foam::PhaseGSChemistryModel<ReactionThermo, GThermoType, SThermoType>::mu(label i, scalar T, scalar p)
+{
+    return gasSpecieThermo_[i].mu(T, p);
+}
+
 
 // ************************************************************************* //
