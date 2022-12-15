@@ -32,7 +32,7 @@ if (solveSpecies)
 
               - fvm::laplacian
                 (
-                    voidfraction*thermophysicalTransport->alphaEff(),
+                    voidfraction*turbulence->muEff(),
                     Yi
                 )
               ==

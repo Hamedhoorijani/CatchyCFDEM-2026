@@ -79,6 +79,7 @@ simpleCatalyticChemistry::simpleCatalyticChemistry
     ofPartCoverages_(nSolidSpecie_),
     partGas_(NULL),
     ofPartGas_(nGasSpecie_),
+    partPressure_(NULL),
     partTempName_(propsDict_.lookupOrDefault<word>("partTempName", "Temp")),
     partTemp_(NULL),
     partQdot_(NULL),
@@ -89,6 +90,7 @@ simpleCatalyticChemistry::simpleCatalyticChemistry
     Yi_(nGasSpecie_, 0.0),
     Ysi_(nSolidSpecie_, 0.0),
     ini_(propsDict_.lookupOrDefault("initialized", false)),
+    partPressName_(propsDict_.lookupOrDefault<word>("partPressName", "p")),
     massTransfer_(false)
 {
     if(sm.nrMassTransferModels() != 0)
@@ -134,6 +136,7 @@ simpleCatalyticChemistry::~simpleCatalyticChemistry()
     if(massTransfer_)
     {
         delete partGas_;
+        delete partPressure_;
     };
     delete partTemp_;
     delete partQdot_;
@@ -158,15 +161,18 @@ void simpleCatalyticChemistry::allocateMyArrays() const
 
     if(massTransfer_)
     {
+        particleCloud_.dataExchangeM().allocateArray(partPressure_, initVal, 1);
         forAll(ofPartGas_, i) ofPartGas_[i].setSize(particleCloud_.numberOfParticles(), Ygs_[i][0]);
         particleCloud_.dataExchangeM().allocateArray(partGas_, initVal, 1);
     };
-    
-    if (useParticleQdot_) particleCloud_.dataExchangeM().giveData(partHeatSourceName_, "scalar-atom", partHeatSource_);
+
+    if (useParticleQdot_) particleCloud_.dataExchangeM().getData(partHeatSourceName_, "scalar-atom", partHeatSource_);
 }
 
 void simpleCatalyticChemistry::execute()
 {
+    //Info << "Starting catalytic chemistry model" << endl;
+
     forAll(Ygs_, i)
     {
         forAll(Ygs_[i], celli)
@@ -178,6 +184,8 @@ void simpleCatalyticChemistry::execute()
     // initialize surface
     if (!ini_)
     {
+        allocateMyArrays();
+
         label celli = 0;
         scalar pi = p_[celli];
         scalar Tgi = Tg_[celli];
@@ -202,7 +210,32 @@ void simpleCatalyticChemistry::execute()
                 !useParticleQdot_ // if particleQdot = true, use absolute energy (sensible energy = false)
             );
 
-        allocateMyArrays();
+        for(int index = 0; index < particleCloud_.numberOfParticles(); ++index)
+        {
+            label cellI = particleCloud_.cellIDs()[index][0];
+            if(cellI >= 0)
+            {
+                for (label i=0; i<nSolidSpecie_; i++) ofPartCoverages_[i][index] = Ysi_[i];
+            }
+        }
+
+        if(massTransfer_)
+        {
+            forAll(ofPartGas_, i)
+            {
+                particleCloud_.dataExchangeM().getData(gasSpecies_[i], "scalar-atom", partGas_);
+                forAll(ofPartGas_[i], index)
+                {
+                    ofPartGas_[i][index] = partGas_[index][0];
+                }
+            }
+            particleCloud_.dataExchangeM().getData(partPressName_, "scalar-atom", partPressure_);
+        };
+
+        if (!useFluidTemperature_)
+        {
+            particleCloud_.dataExchangeM().getData(partTempName_, "scalar-atom", partTemp_);
+        }
 
         ini_ = true;
     }
@@ -218,22 +251,24 @@ void simpleCatalyticChemistry::execute()
                 ofPartCoverages_[i][index] = partCoverages_[index][0];
             }
         }
+
         if(massTransfer_)
         {
             forAll(ofPartGas_, i)
             {
                 particleCloud_.dataExchangeM().getData(gasSpecies_[i], "scalar-atom", partGas_);
-            forAll(ofPartGas_[i], index)
-            {
-                ofPartGas_[i][index] = partGas_[index][0];
+                forAll(ofPartGas_[i], index)
+                {
+                    ofPartGas_[i][index] = partGas_[index][0];
+                }
             }
-        } 
+            particleCloud_.dataExchangeM().getData(partPressName_, "scalar-atom", partPressure_);
         };
-    }
 
-    if (!useFluidTemperature_)
-    {
-        particleCloud_.dataExchangeM().getData(partTempName_, "scalar-atom", partTemp_);
+        if (!useFluidTemperature_)
+        {
+            particleCloud_.dataExchangeM().getData(partTempName_, "scalar-atom", partTemp_);
+        }
     }
 
     for(int index = 0; index < particleCloud_.numberOfParticles(); ++index)
@@ -241,19 +276,21 @@ void simpleCatalyticChemistry::execute()
         label cellI = particleCloud_.cellIDs()[index][0];
         if(cellI >= 0)
         {
+            scalar pi;
             if(!massTransfer_)
             {
                 for (label i=0; i<nGasSpecie_; i++) Yi_[i] = Ygs_[i][cellI];
+                pi = p_[cellI];
             }
             else
             {
                 for (label i=0; i<nGasSpecie_; i++) Yi_[i] = ofPartGas_[i][index];
+                pi = partPressure_[index][0];
             };
             for (label i=0; i<nSolidSpecie_; i++) Ysi_[i] = ofPartCoverages_[i][index];
 
             if (useFluidTemperature_)
             {
-                scalar pi = p_[cellI];
                 scalar Tgi = Tg_[cellI];
 
                 partQdot_[index][0] =
@@ -274,8 +311,6 @@ void simpleCatalyticChemistry::execute()
             }
             else
             {
-                scalar pi = p_[cellI];
-
                 partQdot_[index][0] =
                     catChemistryPtr_->getRatesQdotI
                     (
@@ -330,21 +365,130 @@ void simpleCatalyticChemistry::execute()
         Qdot_.primitiveFieldRef() /= Qdot_.mesh().V();
     }
 
-    forAll(RR_, i)
+    //If masstransfer is disabled, RR must be fed to YEqn.H
+    //If enabled, gas species within particle is consumed and catalytic RR in YEqn.H must remain zero
+    if(!massTransfer_)
     {
-        forAll(ofPartRR_[i], index)
+        forAll(RR_, i)
         {
-            partRR_[index][0] = ofPartRR_[i][index];
+            forAll(ofPartRR_[i], index)
+            {
+                partRR_[index][0] = ofPartRR_[i][index];
+            }
+            RR_[i].primitiveFieldRef() = 0.0;
+            particleCloud_.averagingM().setScalarSum
+            (
+                RR_[i],
+                partRR_,
+                particleCloud_.particleWeights(),
+                NULL
+            );
+            RR_[i].primitiveFieldRef() /= RR_[i].mesh().V();
         }
-        RR_[i].primitiveFieldRef() = 0.0;
-        particleCloud_.averagingM().setScalarSum
-        (
-            RR_[i],
-            partRR_,
-            particleCloud_.particleWeights(),
-            NULL
-        );
-        RR_[i].primitiveFieldRef() /= RR_[i].mesh().V();
+    }
+    else
+    {
+        scalar dt = particleCloud_.mesh().time().deltaTValue();
+        forAll(RR_, i)
+        {
+            RR_[i].primitiveFieldRef() = 0.0;
+        }
+        for(int index = 0; index < particleCloud_.numberOfParticles(); ++index)
+        {
+            label cellI = particleCloud_.cellIDs()[index][0];
+            if(cellI >= 0)
+            {
+                scalar RRnet_ = 0.0;
+                scalar R_ = 8.314462618;
+                scalar T_;
+                scalar Y_MW = 0;
+                scalar mRnet_ =0;
+                if(useFluidTemperature_)
+                {
+                    T_ = Tg_[cellI];
+                }
+                else
+                {
+                    T_ = partTemp_[index][0];
+                }
+
+                //temporarily store mole frac in ofPartGas
+                //if(index==0) Info << '\t' << "Info regarding starting state of particle 0 and specie CH4:" << endl;
+                //if(index==0) Info << '\t' << '\t' << "- CH4 mass fraction in particle: " << ofPartGas_[10][index] << endl;
+
+
+                forAll(Yg_, i)
+                {
+                    Y_MW += ofPartGas_[i][index]/catThermoPtr_->composition().Wi(i);
+                }
+                forAll(Yg_, i)
+                {
+                    ofPartGas_[i][index] = ofPartGas_[i][index]/catThermoPtr_->composition().Wi(i)/Y_MW;
+                }
+
+                forAll(Yg_, i)
+                {
+                    RRnet_  += ofPartRR_[i][index]*dt/(catThermoPtr_->composition().Wi(i)*1e-3); //in mol/s
+                    mRnet_ += ofPartRR_[i][index]*dt;
+
+                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- CH4 mass fraction in bulk phase: " << Ygs_[i][cellI] << endl;
+                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- CH4 mole fraction in particle: " << ofPartGas_[i][index] << endl;
+                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- nCH4 in particle: " << ofPartGas_[i][index]*partPressure_[index][0]/(R_*T_)*catChemistryPtr_->porosity()*particleCloud_.particleVolume(index)  << endl;
+                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- Gas mass in particle: " << partPressure_[index][0]/(R_*T_)*catChemistryPtr_->porosity()*particleCloud_.particleVolume(index)*catThermoPtr_->composition().Wi(i)*1e-3/ofPartGas_[i][index] << endl;
+                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- Pressure in particle: " << partPressure_[index][0] << endl;
+                    //if(index==0 && i == 10) Info << '\t' << "Info regarding reaction of CH4 in particle 0:" << endl;
+                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- RR_CH4: " << ofPartRR_[i][index] << endl;
+                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- nCH4 reacting: " << ofPartRR_[i][index]*dt/(catThermoPtr_->composition().Wi(i)*1e-3) << endl;
+
+                    ofPartGas_[i][index] = max(ofPartGas_[i][index]*partPressure_[index][0]/(R_*T_)*catChemistryPtr_->porosity()*particleCloud_.particleVolume(index) + ofPartRR_[i][index]*dt/(catThermoPtr_->composition().Wi(i)*1e-3),0.0);
+
+                    //if(index==0 && i == 10) Info << '\t' << "Info regarding end state particle 0 and specie CH4:" << endl;
+                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- nCH4 in particle: " << ofPartGas_[i][index] << endl;
+                }
+                //if(index == 0) Info << "RRnet_: " << RRnet_ << endl;
+                //if(index == 0) Info << "mRnet_: " << mRnet_ << endl;
+
+                //Transform ofPartGas back to mass fractions
+                scalar Mt_ = 0.0;
+                scalar nt_ = 0.0;
+                forAll(Yg_, i)
+                {
+                    Mt_ += ofPartGas_[i][index]*catThermoPtr_->composition().Wi(i);
+                    nt_ += ofPartGas_[i][index];
+                }
+
+                //if(index == 0) Info << "Mt_: " << Mt_*1e-3 << endl;
+                //if(index == 0) Info << "nt_: " << nt_ << endl;
+
+                forAll(Yg_, i)
+                {
+                    ofPartGas_[i][index] = ofPartGas_[i][index]*catThermoPtr_->composition().Wi(i)/Mt_;
+                    //if(index == 0 && i== 10) Info << "Yg after for CH4 for particle " << index << " : " << ofPartGas_[i][index] << endl;
+                    //if(index == 0 && i== 2) Info << "Yg after for O2 for particle " << index << " : " << ofPartGas_[i][index] << endl;
+                    //Info << "Yg for specie " << i << " for particle " << index << " : " << ofPartGas_[i][index] << endl;
+                }
+                //if(index == 0)Info << "delta P :" << RRnet_*R_*T_/(catChemistryPtr_->porosity()*particleCloud_.particleVolume(index)) << endl;
+                partPressure_[index][0] += RRnet_*R_*T_/(catChemistryPtr_->porosity()*particleCloud_.particleVolume(index));
+
+                //if(index==0) Info << '\t' << '\t' << "- CH4 mass fraction in particle: " << ofPartGas_[10][index] << endl;
+                //if(index==0) Info << '\t' << '\t' << "- Gas mass in particle: " << Mt_*1e-3 << endl;
+                //if(index==0) Info << '\t' << '\t' << "- Pressure in particle: " << partPressure_[index][0] << endl;
+
+            }
+            else
+            {
+                partPressure_[index][0] = 0;
+            }
+        }
+        forAll(ofPartGas_, i)
+        {
+            forAll(ofPartGas_[i], index)
+            {
+                partGas_[index][0] = particleCloud_.cellIDs()[index][0] >= 0 ? ofPartGas_[i][index] : 0.0;
+            }
+            particleCloud_.dataExchangeM().giveData(gasSpecies_[i], "scalar-atom", partGas_);
+        }
+        particleCloud_.dataExchangeM().giveData(partPressName_, "scalar-atom", partPressure_);
     }
 }
 
@@ -369,21 +513,9 @@ void simpleCatalyticChemistry::postFlow()
         particleCloud_.dataExchangeM().giveData(solidSpecies_[i], "scalar-atom", partCoverages_);
     }
 
-    if(massTransfer_)
-    {
-        forAll(ofPartGas_, i)
-        {
-            forAll(ofPartGas_[i], index)
-            {
-                partGas_[index][0] = particleCloud_.cellIDs()[index][0] >= 0 ? ofPartGas_[i][index] : 0.0;
-            }
-            particleCloud_.dataExchangeM().giveData(gasSpecies_[i], "scalar-atom", partGas_);
-        }
-    };
-
     if (useParticleQdot_)
     {
-        // energyModel::postFlow() has been called before this function (see cfdemCloudEnergy.C), 
+        // energyModel::postFlow() has been called before this function (see cfdemCloudEnergy.C),
         // so the data in partHeatSource_ is the heat transfer from the current time step (e.g. via Gunn)
         // Here we add the reaction heat and send the field back to LIGGGHTS
         particleCloud_.dataExchangeM().getData(partHeatSourceName_,"scalar-atom", partHeatSource_);

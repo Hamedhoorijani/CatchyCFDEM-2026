@@ -215,4 +215,11 @@ Foam::StandardGSChemistryModel<ReactionThermo, GThermoType, SThermoType>::mu(lab
     return gasSpecieThermo_[i].mu(T, p);
 }
 
+template<class ReactionThermo, class GThermoType, class SThermoType>
+Foam::scalar
+Foam::StandardGSChemistryModel<ReactionThermo, GThermoType, SThermoType>::porosity()
+{
+    return por_;
+}
+
 // ************************************************************************* //

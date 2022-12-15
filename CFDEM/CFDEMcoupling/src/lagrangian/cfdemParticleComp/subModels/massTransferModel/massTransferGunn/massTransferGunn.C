@@ -49,9 +49,11 @@ massTransferGunn::massTransferGunn
     catThermoPtr_(rhoReactionThermo::New(particleCloud_.mesh(), catalystName_)),
     catChemistryPtr_(basicGSChemistryModel::New(catThermoPtr_())),
     Yg_(dynamic_cast<const rhoReactionThermo&>(sm.thermo()).composition().Y()),
+    Tg_(sm.thermo().T()),
     nGasSpecie_(Yg_.size()),
     gasSpecies_(catThermoPtr_->composition().species()),
-    ofPartGasFrac_(NULL),
+    ofPartGasFrac_(nGasSpecie_),
+    partGasFrac_(NULL),
     massFlux_(nGasSpecie_),
     ReField_
     (   IOobject
@@ -91,6 +93,8 @@ massTransferGunn::massTransferGunn
     partRe_(NULL),
     partSh_(NULL),
     ofPartMassFlux_(nGasSpecie_),
+    partPressName_(propsDict_.lookupOrDefault<word>("partPressName", "p")),
+    partPressure_(NULL),
     scaleDia_(1.),
     scaleSherwood_(propsDict_.lookupOrDefault<scalar>("scaleSherwood",1.0)),
     typeCG_(propsDict_.lookupOrDefault<scalarList>("coarseGrainingFactors",scalarList(1,1.0)))
@@ -129,8 +133,9 @@ massTransferGunn::massTransferGunn
 
 massTransferGunn::~massTransferGunn()
 {
-    particleCloud_.dataExchangeM().destroy(ofPartGasFrac_,nGasSpecie_);
+    particleCloud_.dataExchangeM().destroy(partGasFrac_,1);
     particleCloud_.dataExchangeM().destroy(partTemp_,1);
+    particleCloud_.dataExchangeM().destroy(partPressure_,1);
     particleCloud_.dataExchangeM().destroy(partMassFlux_,1);
     particleCloud_.dataExchangeM().destroy(partRe_,1);
     particleCloud_.dataExchangeM().destroy(partSh_,1);
@@ -141,9 +146,11 @@ void massTransferGunn::allocateMyArrays() const
 {
     // get memory for 2d arrays
     double initVal=0.0;
-    particleCloud_.dataExchangeM().allocateArray(partTemp_,initVal,1);  // field/initVal/with
+    particleCloud_.dataExchangeM().allocateArray(partTemp_,initVal,1);  // field/initVal/width
     particleCloud_.dataExchangeM().allocateArray(partMassFlux_,initVal,1);
-    particleCloud_.dataExchangeM().allocateArray(ofPartGasFrac_, initVal, nGasSpecie_);
+    particleCloud_.dataExchangeM().allocateArray(partPressure_,initVal,1);
+    particleCloud_.dataExchangeM().allocateArray(partGasFrac_, initVal, 1);
+    forAll(ofPartGasFrac_, i) ofPartGasFrac_[i].setSize(particleCloud_.numberOfParticles(), 0.0);
     forAll(ofPartMassFlux_, i) ofPartMassFlux_[i].setSize(particleCloud_.numberOfParticles(), 0.0);
 }
 
@@ -154,9 +161,16 @@ void massTransferGunn::calcMassTransferContribution()
    // realloc the arrays
     allocateMyArrays();
 
-    particleCloud_.dataExchangeM().getData(gasName_, "vector-atom", ofPartGasFrac_);
-
+    forAll(ofPartGasFrac_, i)
+    {
+        particleCloud_.dataExchangeM().getData(gasSpecies_[i], "scalar-atom", partGasFrac_);
+        forAll(ofPartGasFrac_[i], index)
+        {
+            ofPartGasFrac_[i][index] = partGasFrac_[index][0];
+        }
+    }
     particleCloud_.dataExchangeM().getData(partTempName_,"scalar-atom",partTemp_);
+    particleCloud_.dataExchangeM().getData(partPressName_,"scalar-atom",partPressure_);
 
     if(particleCloud_.cg() > 1.)
     {
@@ -190,16 +204,20 @@ void massTransferGunn::calcMassTransferContribution()
     scalar rhof(0);
     scalar magUr(0);
     scalar Rep(0);
-    scalar Sc(0);
+    scalar Sc(1);
     scalar Shp(0);
+    scalarField molefrac_(nGasSpecie_,0.0);
+    scalar dt = particleCloud_.mesh().time().deltaTValue();
+
+    //Info << "Starting mass transfer" << endl;
 
     for(int index = 0;index < particleCloud_.numberOfParticles(); ++index)
     {
             cellI = particleCloud_.cellIDs()[index][0];
             if(cellI >= 0)
             {
-                    voidfraction = voidfraction_[cellI];
-                    Ufluid = U_[cellI];
+                voidfraction = voidfraction_[cellI];
+                Ufluid = U_[cellI];
 
                 if (voidfraction < 0.01)
                     voidfraction = 0.01;
@@ -220,16 +238,92 @@ void massTransferGunn::calcMassTransferContribution()
                 scalar k_lump;
                 scalar D_;
                 scalar mu_;
+                scalar Y_MW = 0;
+                scalar mg_ptot0 = 0;
+                scalar mg_ptot = 0;
+                scalar MWav_ = 0;
+                scalar ntot_ = 0;
+                scalar R_ = 8.314462618;
+
+                forAll(Yg_, i)
+                {
+                    Y_MW += ofPartGasFrac_[i][index]/catThermoPtr_->composition().Wi(i);
+                }
+                forAll(Yg_, i)
+                {
+                    molefrac_[i] = ofPartGasFrac_[i][index]/catThermoPtr_->composition().Wi(i)/Y_MW;
+                    MWav_ += molefrac_[i]*catThermoPtr_->composition().Wi(i);
+                }
 
                 forAll(massFlux_, i)
                 {
-                    mu_ = catChemistryPtr_->mu(i, partTemp_[index][0], p_[cellI]); 
+                    mu_ = catChemistryPtr_->mu(i, partTemp_[index][0], p_[cellI]);
                     D_ = mu_/rhof;
                     k_lump = D_ * Shp / ds * ds * ds * M_PI;
-                    massFlux(index, i, k_lump, Yg_[i][cellI], ofPartGasFrac_[index][i]);
+                    mg_ptot0 = partPressure_[index][0]*catChemistryPtr_->porosity()*particleCloud_.particleVolume(index)/(R_*partTemp_[index][0])*MWav_*1e-3;
+                    //if(index==0 && i == 10) Info << "MF mg_ptot0:" << mg_ptot0 << endl;
+                    //if(index==0 && i == 10) Info << '\t' << "Info regarding starting state of particle 0 and specie CH4:" << endl;
+                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- Particle pressure: " << partPressure_[index][0] << endl;
+                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- Pressure in gas phase: " << p_[cellI] << endl;
+                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- Mass fraction particle CH4: " << ofPartGasFrac_[i][index] << endl;
+                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- Mass fraction gas CH4: " << Yg_[i][cellI] << endl;
+                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- Gas density in particle: " << mg_ptot0/(catChemistryPtr_->porosity()*particleCloud_.particleVolume(index)) << endl;
+                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- Gas density in bulk phase: " << rhof << endl;
+                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- CH4 mass concentration in particle: " << ofPartGasFrac_[i][index]*mg_ptot0/(catChemistryPtr_->porosity()*particleCloud_.particleVolume(index)) << endl;
+                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- CH4 mass concentration in bulk phase: " << Yg_[i][cellI]*rhof << endl;
+                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- Gas mass in particle: " << mg_ptot0 << endl;
+                    massFlux(index, i, k_lump, Yg_[i][cellI], ofPartGasFrac_[i][index], mg_ptot0, rhof);
+                    //if(index==0 && i == 10) Info << '\t' << "Info during calculation of particle 0 and specie CH4:" << endl;
+                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- CH4 mass in particle before: " << ofPartGasFrac_[i][index]*mg_ptot0 << endl;
+                    ofPartGasFrac_[i][index] = max(ofPartGasFrac_[i][index]*mg_ptot0 + ofPartMassFlux_[i][index]*dt,0.0);
+                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- CH4 mass entering particle: " << ofPartMassFlux_[i][index]*dt << endl;
+                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- CH4 mass in particle after: " << ofPartGasFrac_[i][index] << endl;
+                    mg_ptot += ofPartGasFrac_[i][index];
+                    //if (index==0 && i== 10) Info << "CH4 net entering entering particle CH4: " << ofPartMassFlux_[i][index]*dt << endl;
                 }
+
+                forAll(massFlux_, i)
+                {
+                    ofPartGasFrac_[i][index] /= mg_ptot;
+                }
+
+                forAll(Yg_, i)
+                {
+                    ntot_ += ofPartGasFrac_[i][index]*mg_ptot/(catThermoPtr_->composition().Wi(i)*1e-3);
+                }
+
+                //if (index==0) Info << "MF ntot_: " << ntot_ << endl;
+
+                forAll(Yg_, i)
+                {
+                    partPressure_[index][0] = ntot_*R_*partTemp_[index][0]/(catChemistryPtr_->porosity()*particleCloud_.particleVolume(index));
+                }
+                //if(index==0) Info << "ntot_: " << ntot_ << endl;
+                //if(index==0) Info << "R_: " << R_ << endl;
+                //if(index==0) Info << "partTemp_[index][0]: " << partTemp_[index][0] << endl;
+                //if(index==0) Info << "pressure after flux: " << partPressure_[index][0] << endl;
+                //if(index==0) Info << '\t' << "Info regarding end state of particle 0 and specie CH4:" << endl;
+                //if(index==0) Info << '\t' << '\t' << "- CH4 mass fraction particle: " << ofPartGasFrac_[10][index] << endl;
+                //if(index==0) Info << '\t' << '\t' << "- CH4 mass particle: " << ofPartGasFrac_[10][index]*mg_ptot << endl;
+                //if(index==0) Info << '\t' << '\t' << "- Pressure in particle: " << partPressure_[index][0] << endl;
+                //if(index==0) Info << '\t' << '\t' << "- Gas mass in particle: " << mg_ptot << endl;
+            }
+            else
+            {
+                partPressure_[index][0] = 0;
             }
     }
+
+    forAll(ofPartGasFrac_, i)
+    {
+        forAll(ofPartGasFrac_[i], index)
+        {
+            partGasFrac_[index][0] = particleCloud_.cellIDs()[index][0] >= 0 ? ofPartGasFrac_[i][index] : 0.0;
+        }
+        particleCloud_.dataExchangeM().giveData(gasSpecies_[i], "scalar-atom", partGasFrac_);
+    }
+
+    particleCloud_.dataExchangeM().giveData(partPressName_, "scalar-atom", partPressure_);
 
     forAll(massFlux_, i)
     {
@@ -251,7 +345,7 @@ void massTransferGunn::calcMassTransferContribution()
     forAll(massFlux_, i)
     {
         massFlux_[i].correctBoundaryConditions();
-    } 
+    }
 }
 
 void massTransferGunn::addMassTransferContribution(volScalarField& Msource, label i) const
@@ -267,10 +361,10 @@ scalar massTransferGunn::Sherwood(scalar voidfraction, scalar Rep, scalar Sc) co
                         Foam::pow(Rep,0.7) * Foam::pow(Sc,0.33);
 }
 
-void massTransferGunn::massFlux(label index, label i, scalar k, scalar Yg, scalar Ygs)
+void massTransferGunn::massFlux(label index, label i, scalar k, scalar Yg, scalar Ygs, scalar mg_ptot0, scalar rhof)
 {
-    ofPartMassFlux_[i][index] = - k * Ygs; // multiply with rho_p?
-    ofPartMassFlux_[i][index] += k * Yg; // multiply with rho_g?
+    ofPartMassFlux_[i][index] = - k * Ygs * mg_ptot0/(catChemistryPtr_->porosity()*particleCloud_.particleVolume(index));
+    ofPartMassFlux_[i][index] += k * Yg * rhof;
 }
 
 void massTransferGunn::giveData()

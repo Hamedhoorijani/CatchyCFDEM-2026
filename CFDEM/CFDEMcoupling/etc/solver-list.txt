@@ -3,3 +3,4 @@ mycfdemSolverRhoPimple/dir
 cfdemSolverReactingRhoPimple/dir
 cfdemSolverCatalyticReactingRhoPimple/dir
 mycfdemSolverCatalyticReactingRhoPimple/dir
+mycfdemSolverCatalyticReactingRhoPimpleMass/dir

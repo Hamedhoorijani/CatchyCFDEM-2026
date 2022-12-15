@@ -49,6 +49,9 @@
 #include "memory.h"
 #include "error.h"
 
+#include <iostream>
+using namespace std;
+
 using namespace LAMMPS_NS;
 
 /* ---------------------------------------------------------------------- */
@@ -92,7 +95,7 @@ void *Memory::srealloc(void *ptr, bigint nbytes, const char *name)
   }
 
   ptr = realloc(ptr,nbytes);
-  
+
   if (ptr == NULL) {
     char str[512];
     if(strcmp(name,"neigh:binhead") == 0)

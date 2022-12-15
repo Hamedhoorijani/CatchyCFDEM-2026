@@ -109,6 +109,8 @@ private:
     mutable double **partGas_;
     mutable List<scalarList> ofPartGas_;
 
+    mutable double **partPressure_;
+
     //- Particle temperature
     word partTempName_;
     mutable double **partTemp_;
@@ -128,6 +130,8 @@ private:
 
     //- Initialization flag
     bool ini_;
+
+    word partPressName_;
 
     //- Flag for diffusive mass transfer
     bool massTransfer_;
@@ -158,6 +162,8 @@ public:
 
 
     // Member Functions
+
+        inline double ** voidfractions();
 
         // - Calculate source terms
         virtual void execute();

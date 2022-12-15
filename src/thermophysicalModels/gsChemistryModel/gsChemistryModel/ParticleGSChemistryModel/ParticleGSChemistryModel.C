@@ -643,6 +643,10 @@ getRatesQdotI
     if (ini)
     {
         initializeSurface();
+        for (label i=0; i<this->nSolidSpecie_; i++)
+        {
+            Ys[i] = Ys_[i][0];
+        }
         return 0.0;
     }
 

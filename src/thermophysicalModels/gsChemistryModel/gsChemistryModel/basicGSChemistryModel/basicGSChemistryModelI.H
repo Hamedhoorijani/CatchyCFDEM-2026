@@ -62,5 +62,4 @@ Foam::basicGSChemistryModel::deltaTChem()
     return deltaTChem_;
 }
 
-
 // ************************************************************************* //

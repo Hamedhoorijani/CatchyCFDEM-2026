@@ -56,7 +56,7 @@ protected:
     dictionary propsDict_;
 
     const word catalystName_;
-    
+
     const word gasName_;
 
     //- Pointer to thermo
@@ -67,13 +67,16 @@ protected:
     //- Reference to the field of fluid specie mass fractions
     const PtrList<volScalarField>& Yg_;
 
+    const volScalarField& Tg_;
+
     //- Number of gas species
     const label nGasSpecie_;
 
     const speciesTable gasSpecies_;
 
-    mutable double **ofPartGasFrac_;
-    //mutable List<scalarList> ofPartGasFrac_;
+    mutable List<scalarList> ofPartGasFrac_;
+
+    mutable double **partGasFrac_;
 
     PtrList<volScalarField> massFlux_;
 
@@ -107,9 +110,11 @@ protected:
 
     mutable double **partSh_;
 
-    mutable double **partGasFrac_;
-
     mutable List<scalarList> ofPartMassFlux_;
+
+    word partPressName_;
+
+    mutable double **partPressure_;
 
     mutable scalar scaleDia_;
 
@@ -123,7 +128,7 @@ protected:
 
     virtual void giveData();
 
-    virtual void massFlux(label, label, scalar, scalar, scalar);
+    virtual void massFlux(label, label, scalar, scalar, scalar, scalar, scalar);
 
 public:
 
@@ -164,4 +169,3 @@ public:
 #endif
 
 // ************************************************************************* //
-

@@ -19,12 +19,12 @@
 #
 # Location of catchyFOAM files
 # Please set to the appropriate path if the default is not correct
-export CATCHY_DIR=$VSC_DATA/catchyFOAM-rome-foss-2020b
+export CATCHY_DIR=$HOME/OpenFOAM/florian-8/catchyFOAM-HPC
 #
 # Location of cantera installation
 # Please set to the appropriate path if the default is not correct
 # (canteraToFoam installation is skipped when variable is empty)
-export CANTERA_DIR=
+export CANTERA_DIR=$HOME/.local
 #
 # END OF (NORMAL) USER EDITABLE PART
 ################################################################################

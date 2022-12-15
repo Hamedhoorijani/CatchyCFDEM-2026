@@ -92,7 +92,7 @@ PACatalyticChemistry::PACatalyticChemistry
     nVar_(nGasSpecie_ + nSolidSpecie_ + 5),
     //phi_(particleCloud_.numberOfParticles()),
     //phiav_(nVar_),
-    ini_(false)
+    ini_(propsDict_.lookupOrDefault("initialized", false))
 {
     allocateMyArrays();
 

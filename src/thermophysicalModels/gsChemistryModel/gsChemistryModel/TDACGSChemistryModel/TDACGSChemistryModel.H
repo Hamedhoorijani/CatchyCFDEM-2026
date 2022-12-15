@@ -321,6 +321,9 @@ public:
 	    //- Return species mu fields
 	    virtual scalar mu(label i, scalar T, scalar p);
 
+      //- Catalyst porosity
+      virtual scalar porosity();
+
             //- Correct catalytic wall fluxes
             void correctCatalyticWallFluxes
             (

@@ -80,7 +80,6 @@ protected:
         //- Latest estimation of integration step
         volScalarField::Internal deltaTChem_;
 
-
     // Protected Member Functions
 
         //- Return non-const access to the latest estimation of integration
@@ -252,6 +251,9 @@ public:
 
 		//- Return species mu fields
 		virtual scalar mu(label i, scalar T, scalar p) = 0;
+
+    //- Catalyst porosity
+    virtual scalar porosity() = 0;
 
                 //- Get rate in one cell or for one particle,
                 //  given the conditions (Y, Ys, rho, T, p).

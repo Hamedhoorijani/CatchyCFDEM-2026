@@ -56,7 +56,7 @@
 
 using namespace LAMMPS_NS;
 
-#define MAXLENGTH 30
+#define MAXLENGTH 100
 
 /* ---------------------------------------------------------------------- */
 
@@ -257,7 +257,7 @@ void CfdDatacoupling::add_pull_property(const char *name, const char *type)
 
 void CfdDatacoupling::add_push_property(const char *name, const char *type)
 {
-    
+
     if(strlen(name) >= MAXLENGTH)
         error->all(FLERR,"Fix couple/cfd: Maximum string length for a variable exceeded");
     if(npush_ >= nvalues_max_) grow_();
