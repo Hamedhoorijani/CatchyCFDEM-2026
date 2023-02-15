@@ -323,7 +323,7 @@ void PACatalyticChemistry::execute()
         if(particleCloud_.cellIDs()[index][0] >= 0)
         {
             scalar partiPA_ = partiPATable_.find(index)();
-            scalar binNumber_ = (partiPA_-iPAmin_)/(max(iPAmax_-iPAmin_,SMALL));
+            scalar binNumber_ = nBins_*(partiPA_-iPAmin_)/(max(iPAmax_-iPAmin_,SMALL));
             phiBin_ = phiTable_.find(partiPA_)();
             partBinTable_.insert(index,binNumber_);
             binCount_[binNumber_]++;
