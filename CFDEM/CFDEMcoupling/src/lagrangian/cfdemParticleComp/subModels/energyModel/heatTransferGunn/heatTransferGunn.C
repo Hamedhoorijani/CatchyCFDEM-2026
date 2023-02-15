@@ -342,8 +342,20 @@ void heatTransferGunn::calcEnergyContribution()
                 muf = mufField[cellI];
                 Rep = ds_scaled * magUr * voidfraction * rho_[cellI]/ muf;
                 Pr = max(SMALL, CpField[cellI] * muf / kappaField[cellI]);
-
                 Nup = Nusselt(voidfraction, Rep, Pr);
+                
+                //Pout << "Rep = " << ds_scaled * magUr * voidfraction * rho_[cellI]/ muf << endl;
+                //Pout << " ds_scaled = " << ds_scaled << endl;
+                //Pout << " magUr = " << magUr << endl;
+                //Pout << " voidfraction = " << voidfraction << endl;
+                //Pout << " rho_[cellI] = " << rho_[cellI] << endl;
+                //Pout << " muf = " << muf << endl;
+
+                //Pout << "Pr = " << max(SMALL, CpField[cellI] * muf / kappaField[cellI]) << endl;
+                //Pout << " CpField[cellI] = " << CpField[cellI] << endl;
+                //Pout << " muf = " << muf << endl;
+                //Pout << " kappaField[cellI] = " << muf << endl;
+
 
                 Tsum += partTemp_[index][0];
                 scalar h = kappaField[cellI] * Nup / ds_scaled;
@@ -480,9 +492,9 @@ void heatTransferGunn::addEnergyCoefficient(volScalarField& Qcoeff) const
 scalar heatTransferGunn::Nusselt(scalar voidfraction, scalar Rep, scalar Pr) const
 {
     return scaleNusselt_*((7 - 10 * voidfraction + 5 * voidfraction * voidfraction) *
-                        (1 + 0.7 * Foam::pow(Rep,0.2) * Foam::pow(Pr,0.33)) +
+                        (1 + 0.7 * Foam::pow(max(SMALL,Rep),0.2) * Foam::pow(Pr,0.33)) +
                         (1.33 - 2.4 * voidfraction + 1.2 * voidfraction * voidfraction) *
-                        Foam::pow(Rep,0.7) * Foam::pow(Pr,0.33));
+                        Foam::pow(max(SMALL,Rep),0.7) * Foam::pow(Pr,0.33));
 }
 
 void heatTransferGunn::heatFlux(label index, scalar h, scalar As, scalar Tfluid, scalar cg3)

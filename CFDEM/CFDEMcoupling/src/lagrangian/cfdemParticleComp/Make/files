@@ -2,7 +2,6 @@ path = cfdemParticle
 cfdemCloud = cfdemCloud
 derived = derived
 cfdTools = cfdTools
-functionObjectsCFDEM = functionObjectsCFDEM
 forceModels = subModels/forceModel
 forceSubModels = subModels/forceModel/forceSubModels
 forceModelsMS = subModels/forceModelMS
@@ -32,9 +31,6 @@ $(derived)/cfdemCloudEnergy/cfdemCloudEnergy.C
 $(cfdTools)/global.C
 $(cfdTools)/IOtools/json/json.C
 $(cfdTools)/newGlobal.C
-
-$(functionObjectsCFDEM)/fvMeshFunctionObjectCFDEM/fvMeshFunctionObjectCFDEM.C
-$(functionObjectsCFDEM)/segregationExtentRad/segregationExtentRad.C
 
 $(averagingModels)/averagingModel/averagingModel.C
 $(averagingModels)/averagingModel/newAveragingModel.C

@@ -96,7 +96,8 @@ massTransferGunn::massTransferGunn
     partPressName_(propsDict_.lookupOrDefault<word>("partPressName", "p")),
     partPressure_(NULL),
     scaleDia_(1.),
-    scaleSherwood_(propsDict_.lookupOrDefault<scalar>("scaleSherwood",1.0)),
+    scaleNusselt_(propsDict_.lookupOrDefault<scalar>("scaleNusselt",1.0)),
+    Le_(propsDict_.lookupOrDefault<scalar>("Le",1.0)),
     typeCG_(propsDict_.lookupOrDefault<scalarList>("coarseGrainingFactors",scalarList(1,1.0)))
 {
     allocateMyArrays();
@@ -178,11 +179,9 @@ void massTransferGunn::calcMassTransferContribution()
         Info << "Mass Transfer Gunn is using scale from liggghts cg = " << scaleDia_ << endl;
     }
 
-    #ifdef compre
-        const volScalarField mufField = particleCloud_.turbulence().mu();
-    #else
-        const volScalarField mufField = particleCloud_.turbulence().nu()*rho_;
-    #endif
+    const volScalarField mufField = particleCloud_.turbulence().mu();
+    const volScalarField CpField = particleCloud_.thermo().Cp();
+    const volScalarField kappaField = particleCloud_.thermo().kappa();
 
     if (typeCG_.size()>1 || typeCG_[0] > 1)
     {
@@ -204,12 +203,11 @@ void massTransferGunn::calcMassTransferContribution()
     scalar rhof(0);
     scalar magUr(0);
     scalar Rep(0);
-    scalar Sc(1);
+    scalar Pr(0);
+    scalar Nup(0);
     scalar Shp(0);
     scalarField molefrac_(nGasSpecie_,0.0);
     scalar dt = particleCloud_.mesh().time().deltaTValue();
-
-    //Info << "Starting mass transfer" << endl;
 
     for(int index = 0;index < particleCloud_.numberOfParticles(); ++index)
     {
@@ -230,10 +228,12 @@ void massTransferGunn::calcMassTransferContribution()
                 rhof = rho_[cellI];
 
                 Rep = ds * magUr * voidfraction * rhof/ muf;
+                Pr = max(SMALL, CpField[cellI] * muf / kappaField[cellI]);
                 //scalar D0 = DOField_[celli]; //field implementation of D0 to be done
 		//Sc = max(SMALL, muf/(rhof*D0));
 
-                Shp = Sherwood(voidfraction, Rep, Sc);
+                Nup = Nusselt(voidfraction, Rep, Pr);
+                Shp = Nup*cbrt(Le_);
 
                 scalar k_lump;
                 scalar D_;
@@ -259,27 +259,11 @@ void massTransferGunn::calcMassTransferContribution()
                 {
                     mu_ = catChemistryPtr_->mu(i, partTemp_[index][0], p_[cellI]);
                     D_ = mu_/rhof;
-                    k_lump = D_ * Shp / ds * ds * ds * M_PI;
+                    k_lump = D_ * Shp / ds * (ds * ds * M_PI * catChemistryPtr_->porosity()); //multiply with porosity since only through this fraction of surface mass is transferred?
                     mg_ptot0 = partPressure_[index][0]*catChemistryPtr_->porosity()*particleCloud_.particleVolume(index)/(R_*partTemp_[index][0])*MWav_*1e-3;
-                    //if(index==0 && i == 10) Info << "MF mg_ptot0:" << mg_ptot0 << endl;
-                    //if(index==0 && i == 10) Info << '\t' << "Info regarding starting state of particle 0 and specie CH4:" << endl;
-                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- Particle pressure: " << partPressure_[index][0] << endl;
-                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- Pressure in gas phase: " << p_[cellI] << endl;
-                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- Mass fraction particle CH4: " << ofPartGasFrac_[i][index] << endl;
-                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- Mass fraction gas CH4: " << Yg_[i][cellI] << endl;
-                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- Gas density in particle: " << mg_ptot0/(catChemistryPtr_->porosity()*particleCloud_.particleVolume(index)) << endl;
-                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- Gas density in bulk phase: " << rhof << endl;
-                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- CH4 mass concentration in particle: " << ofPartGasFrac_[i][index]*mg_ptot0/(catChemistryPtr_->porosity()*particleCloud_.particleVolume(index)) << endl;
-                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- CH4 mass concentration in bulk phase: " << Yg_[i][cellI]*rhof << endl;
-                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- Gas mass in particle: " << mg_ptot0 << endl;
                     massFlux(index, i, k_lump, Yg_[i][cellI], ofPartGasFrac_[i][index], mg_ptot0, rhof);
-                    //if(index==0 && i == 10) Info << '\t' << "Info during calculation of particle 0 and specie CH4:" << endl;
-                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- CH4 mass in particle before: " << ofPartGasFrac_[i][index]*mg_ptot0 << endl;
                     ofPartGasFrac_[i][index] = max(ofPartGasFrac_[i][index]*mg_ptot0 + ofPartMassFlux_[i][index]*dt,0.0);
-                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- CH4 mass entering particle: " << ofPartMassFlux_[i][index]*dt << endl;
-                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- CH4 mass in particle after: " << ofPartGasFrac_[i][index] << endl;
                     mg_ptot += ofPartGasFrac_[i][index];
-                    //if (index==0 && i== 10) Info << "CH4 net entering entering particle CH4: " << ofPartMassFlux_[i][index]*dt << endl;
                 }
 
                 forAll(massFlux_, i)
@@ -292,21 +276,10 @@ void massTransferGunn::calcMassTransferContribution()
                     ntot_ += ofPartGasFrac_[i][index]*mg_ptot/(catThermoPtr_->composition().Wi(i)*1e-3);
                 }
 
-                //if (index==0) Info << "MF ntot_: " << ntot_ << endl;
-
                 forAll(Yg_, i)
                 {
                     partPressure_[index][0] = ntot_*R_*partTemp_[index][0]/(catChemistryPtr_->porosity()*particleCloud_.particleVolume(index));
                 }
-                //if(index==0) Info << "ntot_: " << ntot_ << endl;
-                //if(index==0) Info << "R_: " << R_ << endl;
-                //if(index==0) Info << "partTemp_[index][0]: " << partTemp_[index][0] << endl;
-                //if(index==0) Info << "pressure after flux: " << partPressure_[index][0] << endl;
-                //if(index==0) Info << '\t' << "Info regarding end state of particle 0 and specie CH4:" << endl;
-                //if(index==0) Info << '\t' << '\t' << "- CH4 mass fraction particle: " << ofPartGasFrac_[10][index] << endl;
-                //if(index==0) Info << '\t' << '\t' << "- CH4 mass particle: " << ofPartGasFrac_[10][index]*mg_ptot << endl;
-                //if(index==0) Info << '\t' << '\t' << "- Pressure in particle: " << partPressure_[index][0] << endl;
-                //if(index==0) Info << '\t' << '\t' << "- Gas mass in particle: " << mg_ptot << endl;
             }
             else
             {
@@ -353,12 +326,12 @@ void massTransferGunn::addMassTransferContribution(volScalarField& Msource, labe
     Msource += massFlux_[i];
 }
 
-scalar massTransferGunn::Sherwood(scalar voidfraction, scalar Rep, scalar Sc) const
+scalar massTransferGunn::Nusselt(scalar voidfraction, scalar Rep, scalar Pr) const
 {
-    return (7 - 10 * voidfraction + 5 * voidfraction * voidfraction) *
-                        (1 + 0.7 * Foam::pow(Rep,0.2) * Foam::pow(Sc,0.33)) +
-                        (1.33 - 2.4 * voidfraction + 1.2 * voidfraction * voidfraction) *
-                        Foam::pow(Rep,0.7) * Foam::pow(Sc,0.33);
+  return scaleNusselt_*((7 - 10 * voidfraction + 5 * voidfraction * voidfraction) *
+                      (1 + 0.7 * Foam::pow(Rep,0.2) * Foam::pow(Pr,0.33)) +
+                      (1.33 - 2.4 * voidfraction + 1.2 * voidfraction * voidfraction) *
+                      Foam::pow(Rep,0.7) * Foam::pow(Pr,0.33));
 }
 
 void massTransferGunn::massFlux(label index, label i, scalar k, scalar Yg, scalar Ygs, scalar mg_ptot0, scalar rhof)

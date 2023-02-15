@@ -118,13 +118,15 @@ protected:
 
     mutable scalar scaleDia_;
 
-    mutable scalar scaleSherwood_;
+    mutable scalar scaleNusselt_;
+
+    mutable scalar Le_;
 
     scalarList typeCG_;
 
     void allocateMyArrays() const;
 
-    scalar Sherwood(scalar, scalar, scalar) const;
+    scalar Nusselt(scalar, scalar, scalar) const;
 
     virtual void giveData();
 

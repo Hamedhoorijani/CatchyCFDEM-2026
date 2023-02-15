@@ -166,7 +166,7 @@ void simpleCatalyticChemistry::allocateMyArrays() const
         particleCloud_.dataExchangeM().allocateArray(partGas_, initVal, 1);
     };
 
-    if (useParticleQdot_) particleCloud_.dataExchangeM().getData(partHeatSourceName_, "scalar-atom", partHeatSource_);
+    if (useParticleQdot_) particleCloud_.dataExchangeM().giveData(partHeatSourceName_, "scalar-atom", partHeatSource_);
 }
 
 void simpleCatalyticChemistry::execute()
