@@ -289,7 +289,15 @@ void PACatalyticChemistry::execute()
         {
             for (label i=0; i < nVar_ ;i++)
             {
-              iPA_[index] += (i+1)*std::log(nVar_*(std::log(max(phi_[index][i],2e-20)/minPhi_[i])/std::log(maxPhi_[i]/minPhi_[i]))/PAtol_); //hash mapping function
+              //Info << "phi_: " << phi_[index][i] << endl;
+              //Info << "minPhi_: " << minPhi_[i] << endl;
+              //Info << "maxPhi_: " << maxPhi_[i] << endl;
+              //Info << "std::log(max(phi_[index][i],1e-20)): " << std::log(max(phi_[index][i],1e-20)) << endl;
+              //Info << "std::log(minPhi_[i]): " << std::log(minPhi_[i]) << endl;
+              //Info << "std::log(maxPhi_[i]): " << std::log(maxPhi_[i]) << endl;
+              //Info << "std::log(minPhi_[i]): " << std::log(minPhi_[i]) << endl;
+              iPA_[index] += (i+1)*std::log(nVar_/PAtol_*(std::log(max(phi_[index][i],2e-20))-std::log(minPhi_[i]))/(std::log(maxPhi_[i])-std::log(minPhi_[i]))); //hash mapping function
+              //iPA_[index] += (i+1)*nVar_/PAtol_*(max(phi_[index][i],1e-20)-minPhi_[i])/(maxPhi_[i]-minPhi_[i]); //hash mapping function
             }
             iPAmin_ = floor(min(iPA_[index], iPAmin_));
             iPAmax_ = ceil(max(iPA_[index], iPAmax_));
@@ -307,6 +315,7 @@ void PACatalyticChemistry::execute()
 
     List<scalarField> Yiav_(nBins_);
     List<scalarField> Ysiav_(nBins_);
+    List<scalarField> YsiavOld_(nBins_);
     scalarField partVolav_(nBins_,0.0);
     scalarField Tgav_(nBins_,0.0);
     scalarField Tsav_(nBins_,0.0);
@@ -315,8 +324,12 @@ void PACatalyticChemistry::execute()
 
     forAll(Yiav_, i) Yiav_[i].setSize(nGasSpecie_, 0.0);
     forAll(Ysiav_, i) Ysiav_[i].setSize(nSolidSpecie_, 0.0);
+    forAll(YsiavOld_, i) Ysiav_[i].setSize(nSolidSpecie_, 0.0);
     forAll(ofPartRRav_, i) ofPartRRav_[i].setSize(nBins_, 0.0);
     forAll(ofPartCoveragesav_, i) ofPartCoveragesav_[i].setSize(nBins_, 0.0);
+
+    //Info << "iPAmin_: " << iPAmin_ << endl;
+    //Info << "iPAmax_: " << iPAmax_ << endl;
 
     for(int index = 0; index < particleCloud_.numberOfParticles(); ++index)
     {
@@ -324,6 +337,8 @@ void PACatalyticChemistry::execute()
         {
             scalar partiPA_ = partiPATable_.find(index)();
             scalar binNumber_ = floor(nBins_*(partiPA_-iPAmin_)/(max(iPAmax_-iPAmin_,SMALL)));
+            //Info << "partiPA_: " << partiPA_ << endl;
+            //Info << "binNumber_: " << binNumber_ << endl;
             phiBin_ = phiTable_.find(partiPA_)();
             partBinTable_.insert(index,binNumber_);
             binCount_[binNumber_]++;
@@ -357,6 +372,8 @@ void PACatalyticChemistry::execute()
         }
     }
 
+    YsiavOld_ = Ysiav_;
+
     scalarField partQdotav_(nBins_,0.0);
     for(int index = 0; index < nBins_; index++) //should be index < NUMBEROFBINS
     {
@@ -383,8 +400,10 @@ void PACatalyticChemistry::execute()
         }
     }
 
+	scalar Ystot;
     for(int index = 0; index < particleCloud_.numberOfParticles(); index++)
     {
+		Ystot = 0.0;
         if(particleCloud_.cellIDs()[index][0] >= 0)
         {
             scalar binNumberFound_ = partBinTable_.find(index)();
@@ -394,11 +413,17 @@ void PACatalyticChemistry::execute()
             }
             for(label k=0; k < nSolidSpecie_; k++)
             {
-                ofPartCoverages_[k][index] = ofPartCoveragesav_[k][binNumberFound_];
+                ofPartCoverages_[k][index] = ofPartCoverages_[k][index] +  ofPartCoveragesav_[k][binNumberFound_] - YsiavOld_[binNumberFound_][k];
+                Ystot += ofPartCoverages_[k][index];
+            }
+             for(label k=0; k < nSolidSpecie_; k++)
+            {
+                ofPartCoverages_[k][index] /= Ystot;
             }
             partQdot_[index][0] = partQdotav_[binNumberFound_];
         }
     }
+    
 
     forAll(Ys_, i)
     {

@@ -9,10 +9,12 @@ source $HOME/setup_CFDEM-8_env-rome-foss-2020b.sh
 # Go to case directory
 cd $PBS_O_WORKDIR
 
-./Allwclean
-./Allwmake
+#./Allwclean
+#./Allwmake
 
 #cd CFDEM
-source $VSC_DATA/catchyFOAM-rome-foss-2020b/CFDEM/CFDEMcoupling/etc/bashrc
-bash $CFDEM_PROJECT_DIR/etc/compileCFDEMcoupling_all.sh
+#source $VSC_DATA/catchyFOAM-rome-foss-2020b/CFDEM/CFDEMcoupling/etc/bashrc
+#bash $CFDEM_PROJECT_DIR/etc/compileCFDEMcoupling_all.sh
 #cfdemCompCFDEMall
+cd CFDEM/CFDEMcoupling/src/lagrangian/cfdemParticleComp
+wmake libso

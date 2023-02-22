@@ -1,0 +1,34 @@
+mesg: ttyname failed: Inappropriate ioctl for device
+could not open file mpi.h for source file subModels/catalyticChemistryModel/PACatalyticChemistry/PACatalyticChemistry.C due to No such file or directory
+could not open file math.h for source file subModels/catalyticChemistryModel/PACatalyticChemistry/PACatalyticChemistry.C due to No such file or directory
+In file included from subModels/catalyticChemistryModel/PACatalyticChemistry/PACatalyticChemistry.C:20:
+subModels/catalyticChemistryModel/PACatalyticChemistry/PACatalyticChemistry.H: In constructor ‘Foam::PACatalyticChemistry::PACatalyticChemistry(const Foam::dictionary&, Foam::cfdemCloudEnergy&)’:
+subModels/catalyticChemistryModel/PACatalyticChemistry/PACatalyticChemistry.H:113:30: warning: ‘Foam::PACatalyticChemistry::ofPartRR_’ will be initialized after [-Wreorder]
+  113 |     mutable List<scalarList> ofPartRR_;
+      |                              ^~~~~~~~~
+subModels/catalyticChemistryModel/PACatalyticChemistry/PACatalyticChemistry.H:108:30: warning:   ‘Foam::List<Foam::List<double> > Foam::PACatalyticChemistry::ofPartRRav_’ [-Wreorder]
+  108 |     mutable List<scalarList> ofPartRRav_;
+      |                              ^~~~~~~~~~~
+subModels/catalyticChemistryModel/PACatalyticChemistry/PACatalyticChemistry.C:39:1: warning:   when initialized here [-Wreorder]
+   39 | PACatalyticChemistry::PACatalyticChemistry
+      | ^~~~~~~~~~~~~~~~~~~~
+In file included from subModels/catalyticChemistryModel/PACatalyticChemistry/PACatalyticChemistry.C:20:
+subModels/catalyticChemistryModel/PACatalyticChemistry/PACatalyticChemistry.H:117:30: warning: ‘Foam::PACatalyticChemistry::ofPartCoverages_’ will be initialized after [-Wreorder]
+  117 |     mutable List<scalarList> ofPartCoverages_;
+      |                              ^~~~~~~~~~~~~~~~
+subModels/catalyticChemistryModel/PACatalyticChemistry/PACatalyticChemistry.H:109:30: warning:   ‘Foam::List<Foam::List<double> > Foam::PACatalyticChemistry::ofPartCoveragesav_’ [-Wreorder]
+  109 |     mutable List<scalarList> ofPartCoveragesav_;
+      |                              ^~~~~~~~~~~~~~~~~~
+subModels/catalyticChemistryModel/PACatalyticChemistry/PACatalyticChemistry.C:39:1: warning:   when initialized here [-Wreorder]
+   39 | PACatalyticChemistry::PACatalyticChemistry
+      | ^~~~~~~~~~~~~~~~~~~~
+In file included from subModels/catalyticChemistryModel/PACatalyticChemistry/PACatalyticChemistry.C:20:
+subModels/catalyticChemistryModel/PACatalyticChemistry/PACatalyticChemistry.H:134:25: warning: ‘Foam::PACatalyticChemistry::Ysi_’ will be initialized after [-Wreorder]
+  134 |     mutable scalarField Ysi_;
+      |                         ^~~~
+subModels/catalyticChemistryModel/PACatalyticChemistry/PACatalyticChemistry.H:90:17: warning:   ‘const label Foam::PACatalyticChemistry::nVar_’ [-Wreorder]
+   90 |     const label nVar_;
+      |                 ^~~~~
+subModels/catalyticChemistryModel/PACatalyticChemistry/PACatalyticChemistry.C:39:1: warning:   when initialized here [-Wreorder]
+   39 | PACatalyticChemistry::PACatalyticChemistry
+      | ^~~~~~~~~~~~~~~~~~~~
