@@ -166,13 +166,11 @@ void simpleCatalyticChemistry::allocateMyArrays() const
         particleCloud_.dataExchangeM().allocateArray(partGas_, initVal, 1);
     };
 
-    if (useParticleQdot_) particleCloud_.dataExchangeM().giveData(partHeatSourceName_, "scalar-atom", partHeatSource_);
+    if (useParticleQdot_) particleCloud_.dataExchangeM().getData(partHeatSourceName_, "scalar-atom", partHeatSource_);
 }
 
 void simpleCatalyticChemistry::execute()
 {
-    //Info << "Starting catalytic chemistry model" << endl;
-
     forAll(Ygs_, i)
     {
         forAll(Ygs_[i], celli)
@@ -231,12 +229,7 @@ void simpleCatalyticChemistry::execute()
             }
             particleCloud_.dataExchangeM().getData(partPressName_, "scalar-atom", partPressure_);
         };
-
-        if (!useFluidTemperature_)
-        {
-            particleCloud_.dataExchangeM().getData(partTempName_, "scalar-atom", partTemp_);
-        }
-
+        
         ini_ = true;
     }
     else
@@ -402,7 +395,6 @@ void simpleCatalyticChemistry::execute()
                 scalar R_ = 8.314462618;
                 scalar T_;
                 scalar Y_MW = 0;
-                scalar mRnet_ =0;
                 if(useFluidTemperature_)
                 {
                     T_ = Tg_[cellI];
@@ -411,11 +403,6 @@ void simpleCatalyticChemistry::execute()
                 {
                     T_ = partTemp_[index][0];
                 }
-
-                //temporarily store mole frac in ofPartGas
-                //if(index==0) Info << '\t' << "Info regarding starting state of particle 0 and specie CH4:" << endl;
-                //if(index==0) Info << '\t' << '\t' << "- CH4 mass fraction in particle: " << ofPartGas_[10][index] << endl;
-
 
                 forAll(Yg_, i)
                 {
@@ -428,25 +415,10 @@ void simpleCatalyticChemistry::execute()
 
                 forAll(Yg_, i)
                 {
-                    RRnet_  += ofPartRR_[i][index]*dt/(catThermoPtr_->composition().Wi(i)*1e-3); //in mol/s
-                    mRnet_ += ofPartRR_[i][index]*dt;
-
-                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- CH4 mass fraction in bulk phase: " << Ygs_[i][cellI] << endl;
-                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- CH4 mole fraction in particle: " << ofPartGas_[i][index] << endl;
-                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- nCH4 in particle: " << ofPartGas_[i][index]*partPressure_[index][0]/(R_*T_)*catChemistryPtr_->porosity()*particleCloud_.particleVolume(index)  << endl;
-                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- Gas mass in particle: " << partPressure_[index][0]/(R_*T_)*catChemistryPtr_->porosity()*particleCloud_.particleVolume(index)*catThermoPtr_->composition().Wi(i)*1e-3/ofPartGas_[i][index] << endl;
-                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- Pressure in particle: " << partPressure_[index][0] << endl;
-                    //if(index==0 && i == 10) Info << '\t' << "Info regarding reaction of CH4 in particle 0:" << endl;
-                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- RR_CH4: " << ofPartRR_[i][index] << endl;
-                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- nCH4 reacting: " << ofPartRR_[i][index]*dt/(catThermoPtr_->composition().Wi(i)*1e-3) << endl;
+                    RRnet_  += ofPartRR_[i][index]*dt/(catThermoPtr_->composition().Wi(i)*1e-3); //in mol
 
                     ofPartGas_[i][index] = max(ofPartGas_[i][index]*partPressure_[index][0]/(R_*T_)*catChemistryPtr_->porosity()*particleCloud_.particleVolume(index) + ofPartRR_[i][index]*dt/(catThermoPtr_->composition().Wi(i)*1e-3),0.0);
-
-                    //if(index==0 && i == 10) Info << '\t' << "Info regarding end state particle 0 and specie CH4:" << endl;
-                    //if(index==0 && i == 10) Info << '\t' << '\t' << "- nCH4 in particle: " << ofPartGas_[i][index] << endl;
                 }
-                //if(index == 0) Info << "RRnet_: " << RRnet_ << endl;
-                //if(index == 0) Info << "mRnet_: " << mRnet_ << endl;
 
                 //Transform ofPartGas back to mass fractions
                 scalar Mt_ = 0.0;
@@ -457,23 +429,12 @@ void simpleCatalyticChemistry::execute()
                     nt_ += ofPartGas_[i][index];
                 }
 
-                //if(index == 0) Info << "Mt_: " << Mt_*1e-3 << endl;
-                //if(index == 0) Info << "nt_: " << nt_ << endl;
-
                 forAll(Yg_, i)
                 {
                     ofPartGas_[i][index] = ofPartGas_[i][index]*catThermoPtr_->composition().Wi(i)/Mt_;
-                    //if(index == 0 && i== 10) Info << "Yg after for CH4 for particle " << index << " : " << ofPartGas_[i][index] << endl;
-                    //if(index == 0 && i== 2) Info << "Yg after for O2 for particle " << index << " : " << ofPartGas_[i][index] << endl;
-                    //Info << "Yg for specie " << i << " for particle " << index << " : " << ofPartGas_[i][index] << endl;
                 }
-                //if(index == 0)Info << "delta P :" << RRnet_*R_*T_/(catChemistryPtr_->porosity()*particleCloud_.particleVolume(index)) << endl;
                 partPressure_[index][0] += RRnet_*R_*T_/(catChemistryPtr_->porosity()*particleCloud_.particleVolume(index));
-
-                //if(index==0) Info << '\t' << '\t' << "- CH4 mass fraction in particle: " << ofPartGas_[10][index] << endl;
-                //if(index==0) Info << '\t' << '\t' << "- Gas mass in particle: " << Mt_*1e-3 << endl;
-                //if(index==0) Info << '\t' << '\t' << "- Pressure in particle: " << partPressure_[index][0] << endl;
-
+                if(index==0) Info << "partPressure_: " << partPressure_[index][0] << endl;
             }
             else
             {

@@ -40,11 +40,16 @@ void Foam::vtkReader::readBlock
     List<T>& lst
 ) const
 {
+    Info << "Reading" << endl;
+    Info << n << endl;
+    Info << lst.max_size() << endl;
     lst.setSize(n);
+    Info << "set size to n" << endl;
     forAll(lst, i)
     {
         inFile >> lst[i];
     }
+	Info << "Finished reading" << endl;
 }
 
 template<class Type>
@@ -588,6 +593,7 @@ Foam::vtkReader::vtkReader
 
 void Foam::vtkReader::read(ISstream& inFile)
 {
+	debug = true;
     inFile.getLine(header_);
     if (debug)
     {
@@ -661,37 +667,37 @@ void Foam::vtkReader::read(ISstream& inFile)
                     << primitiveTag
                     << exit(FatalIOError);
             }
-
-            if(nPoints%3==0)
+            
+            /*if(nPoints%3==0)
             {
                 for(int i=0; i < nPoints/3 ; i++)
                 {
-                    int j = 3*i;
+                    int j = i*3;
                     inFile >> points_[j].x() >> points_[j].y() >> points_[j].z() >> points_[j+1].x() >> points_[j+1].y() >> points_[j+1].z() >> points_[j+2].x() >> points_[j+2].y() >> points_[j+2].z();
                 }
             }
             else if(nPoints%3==1)
             {
-                for(int i=0; i < nPoints/3-1 ; i++)
+                for(int i=0; i < (nPoints-1)/3 ; i++)
                 {
-                    int j = 3*i;
+                    int j = i*3;
                     inFile >> points_[j].x() >> points_[j].y() >> points_[j].z() >> points_[j+1].x() >> points_[j+1].y() >> points_[j+1].z() >> points_[j+2].x() >> points_[j+2].y() >> points_[j+2].z();
                 }
                 inFile >> points_[nPoints].x() >> points_[nPoints].y() >> points_[nPoints].z();
             }
             else if(nPoints%3==2)
             {
-                for(int i=0; i < nPoints/3-1 ; i++)
+                for(int i=0; i < (nPoints-2)/3 ; i++)
                 {
-                    int j = 3*i;
+                    int j = i*3;
                     inFile >> points_[j].x() >> points_[j].y() >> points_[j].z() >> points_[j+1].x() >> points_[j+1].y() >> points_[j+1].z() >> points_[j+2].x() >> points_[j+2].y() >> points_[j+2].z();
                 }
                 inFile >> points_[nPoints-1].x() >> points_[nPoints-1].y() >> points_[nPoints-1].z() >> points_[nPoints].x() >> points_[nPoints].y() >> points_[nPoints].z();
-            }
-            /*forAll(points_, i)
+            }*/
+            forAll(points_, i)
             {
                 inFile >> points_[i].x() >> points_[i].y() >> points_[i].z();
-            }*/
+            }
             Info << "nPoints = " << nPoints << endl;
             //Info << "points_ = " << points_ << endl;
             //for(int i =0; i < nPoints/3-2 ; i=+3)

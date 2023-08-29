@@ -54,6 +54,7 @@ private:
     const word catalystName_;
 
     const scalar PAtol_;
+    const scalar PAtolp_;
 
     const scalar nBins_;
 
@@ -87,10 +88,11 @@ private:
     //- Number of surface species
     const label nSolidSpecie_;
 
-    const label nVar_;
-
     //- Reference to surface species table
     const speciesTable solidSpecies_;
+    
+    //- Reference to gas species table
+    const speciesTable gasSpecies_;
 
     //- Switch to use fluid temperature instead of particle temperature
     const bool useFluidTemperature_;
@@ -101,20 +103,21 @@ private:
     //- Field of reaction heat [J/m^3/s = kg/m^2/s^3]
     volScalarField Qdot_;
 
-    //phi contains gas and solid mass fracions + gas and solid temperature + pressure + density
-    //mutable List<scalarList> phi_;
-
-    //mutable List<scalarList> phiav_;
-    mutable List<scalarList> ofPartRRav_;
-    mutable List<scalarList> ofPartCoveragesav_;
-
     //- List of total reaction rate per fluid specie [kg/s] per particle
     mutable double **partRR_;
     mutable List<scalarList> ofPartRR_;
-
+    mutable List<scalarList> ofPartRRav_;
+    
     //- List of surface species coverages on particles
     mutable double **partCoverages_;
     mutable List<scalarList> ofPartCoverages_;
+    mutable List<scalarList> ofPartCoveragesav_;
+    
+    //- List of gas species in particles (used when considering mass transfer)
+    mutable double **partGas_;
+    mutable List<scalarList> ofPartGas_;
+    
+    mutable double **partPressure_;
 
     //- Particle temperature
     word partTempName_;
@@ -132,9 +135,16 @@ private:
     mutable scalarField dcdt_;
     mutable scalarField Yi_;
     mutable scalarField Ysi_;
+    
+    const label nVar_;
 
     //- Initialization flag
     bool ini_;
+    
+    word partPressName_;
+
+    //- Flag for diffusive mass transfer
+    bool massTransfer_;
 
     // Private Member Functions
 

@@ -10,6 +10,9 @@
     rhoEqn.solve();
 
     fvOptions.correct(rho);
+    
+    Info << "voidfraction max/min: " << max(voidfraction).value() << "/" << min(voidfraction).value() << endl;
+
 }
 
 // ************************************************************************* //

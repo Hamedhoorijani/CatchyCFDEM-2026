@@ -192,6 +192,20 @@ autoPtr<CombustionModel<rhoReactionThermo>> reaction
     CombustionModel<rhoReactionThermo>::New(thermo, turbulence())
 );
 
+volScalarField catRR
+(
+    IOobject
+    (
+        "catRR",
+        runTime.timeName(),
+        mesh,
+        IOobject::NO_READ,
+        IOobject::NO_WRITE
+    ),
+    mesh,
+    dimensionedScalar(dimensionSet(1,-3,-1,0,0,0,0), 0.0)
+);
+
 Info<< "Creating field dpdt\n" << endl;
 volScalarField dpdt
 (

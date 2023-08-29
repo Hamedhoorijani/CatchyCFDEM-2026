@@ -9,6 +9,10 @@ if (solveEnergy)
 
     thCond = particleCloud.thermCondM().thermCond();
 
+	particleCloud.smoothingM().smoothen(Qdot);
+	particleCloud.smoothingM().smoothen(Qsource);
+	particleCloud.smoothingM().smoothen(QCoeff);
+
     fvScalarMatrix EEqn
     (
         fvm::ddt(voidfraction*rho, he) + fvm::div(phi, he)

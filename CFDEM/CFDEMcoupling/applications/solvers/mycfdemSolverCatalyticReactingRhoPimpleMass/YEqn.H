@@ -24,6 +24,10 @@ if (solveSpecies)
         {
             volScalarField& Yi = Y[i];
             particleCloud.massTransferContributions(MFlux, i);
+            catRR = particleCloud.catalyticReactionRate(i); //            
+			if(particleCloud.nrMassTransferModels() == 0) particleCloud.smoothingM().smoothen(catRR); //
+			if(particleCloud.nrMassTransferModels() > 0) particleCloud.smoothingM().smoothen(MFlux); //
+
 
             fvScalarMatrix YiEqn
             (
@@ -32,12 +36,13 @@ if (solveSpecies)
 
               - fvm::laplacian
                 (
-                    voidfraction*turbulence->muEff(),
+                    voidfraction*thermophysicalTransport->alphaEff(),
                     Yi
                 )
               ==
                 voidfraction*reaction->R(Yi)
-              + particleCloud.catalyticReactionRate(i)
+              //+ particleCloud.catalyticReactionRate(i)
+              + catRR //
               + MFlux
               + fvOptions(voidfraction, rho, Yi)
             );
@@ -53,20 +58,20 @@ if (solveSpecies)
             Yi.max(0.0);
             Yt += Yi;
         }
-        Info << Y[i].name() << " max/min: " << max(Y[i]).value() << "/" << min(Y[i]).value() << endl;
+        Info << Y[i].name() << " max/min before scaling: " << max(Y[i]).value() << "/" << min(Y[i]).value() << endl;
     }
 
     if (inertIndex != -1)
     {
         Y[inertIndex] = scalar(1) - Yt;
         Y[inertIndex].max(0.0);
-        /*forAll(Y, i)
+        forAll(Y, i)
         {
             if (i != inertIndex)
             {
                 Y[i] *= (scalar(1)-Y[inertIndex])/Yt;
             }
-        }*/
+        }
     }
     else
     {

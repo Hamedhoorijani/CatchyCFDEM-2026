@@ -1483,6 +1483,11 @@ getRatesQdotI
     if (ini)
     {
         this->initializeSurface();
+        for (label i=0; i<this->nSolidSpecie_; i++)
+        {
+            Ys[i] = this->Ys_[i][0];
+            Info << "Ys[i]: " << Ys[i] << endl;
+        }
         return 0.0;
     }
 
