@@ -1,0 +1,219 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  8
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      couplingProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+syncMode            false;
+//verbose;
+
+modelType           A;
+
+couplingInterval    20;
+
+voidFractionModel   centre;//divided;
+
+locateModel         engine;
+
+meshMotionModel     noMeshMotion;
+
+regionModel         allRegion;
+
+IOModel             off;
+
+probeModel          off;
+
+dataExchangeModel   twoWayMPI;
+
+averagingModel      dense;
+
+clockModel          off;
+
+smoothingModel      off;
+
+forceModels
+(
+    GidaspowDrag
+    //TangDrag
+    gradPForce
+    viscForce
+    fieldStore
+);
+
+energyModels
+(
+    heatTransferGunn
+);
+
+massTransferModels
+(
+);
+
+catalyticChemistryModels
+(
+    off
+);
+
+eModels
+(
+  off // electricEModel // constantEModel  //magneticEModel
+);
+
+thermCondModel      SyamlalThermCond;
+
+momCoupleModels
+(
+    implicitCouple
+);
+
+//===========================================================================//
+
+heatTransferGunnProps
+{
+    verbose             true;
+    partTempName        "Temp";
+    partHeatFluxName    "convectiveHeatFlux";
+    calcPartTempField   true;
+    //partRefTemp         298;
+    interpolation       true;
+    implicit            true;
+}
+
+implicitCoupleProps
+{
+    velFieldName        "U";
+    granVelFieldName    "Us";
+    voidfractionFieldName "voidfraction";
+    interpolation       false;
+}
+
+gradPForceProps
+{
+    pFieldName          "p";
+    voidfractionFieldName "voidfraction";
+    velocityFieldName   "U";
+    interpolation       false;
+}
+
+viscForceProps
+{
+    velocityFieldName   "U";
+    interpolation       false;
+}
+
+BeetstraDragProps
+{
+    verbose             false;
+    velFieldName        "U";
+    voidfractionFieldName "voidfraction";
+    granVelFieldName    "Us";
+    interpolation       false;
+    phi                 1;
+}
+
+TangDragProps
+{
+    velFieldName        "U";
+    voidfractionFieldName "voidfraction";
+    granVelFieldName    "Us";
+	verbose             false;
+	interpolation		false;
+}
+GidaspowDragProps
+{
+    verbose             false;
+    velFieldName        "U";
+    voidfractionFieldName "voidfraction";
+    granVelFieldName    "Us";
+    interpolation       false;
+    phi                 1;
+}
+
+magneticEModelProps
+{
+    HFieldName		"H";
+    BFieldName		"B";
+    emfFieldName	"emf";
+    QjFieldName	"cellQj";
+    partHeatSourceName	"heatSource";
+    useParticleQdot	true;
+    particlesEResistivity	0.001;
+}
+
+electricEModelProps
+{
+    emfFieldName	"emfVec";
+    QjFieldName	"cellQj";
+    partHeatSourceName	"heatSource";
+    useParticleQdot	true;
+    particlesEResistivity	0.001;
+}
+
+constantEModelProps
+{
+    partHeatSourceName	"heatSource";
+    useParticleQdot	 true;
+}
+
+BeetstraPolyDragProps
+{
+    verbose             false;
+    velFieldName        "U";
+    voidfractionFieldName "voidfraction";
+    granVelFieldName    "Us";
+    interpolation       false;
+    phi                 1;
+}
+
+SyamlalThermCondProps
+{
+    voidfractionFieldName "voidfraction";
+}
+
+fieldStoreProps
+{
+    scalarFieldNames
+    (
+    );
+
+    vectorFieldNames
+    (
+        "U"
+    );
+}
+
+centreProps
+{
+    alphaMin            0.10;
+    interpolation       false;
+}
+
+dividedProps
+{
+    alphaMin            0.10;
+    scaleUpVol          1.0;
+    interpolation       false;
+}
+
+engineProps
+{
+    treeSearch          true;
+}
+
+"(twoWayMPIProps|M2MProps)"
+{
+    liggghtsPath        "../DEM/in.liggghts_run";
+    scalarAtomTransferData		(heatSource);
+}
+// ************************************************************************* //

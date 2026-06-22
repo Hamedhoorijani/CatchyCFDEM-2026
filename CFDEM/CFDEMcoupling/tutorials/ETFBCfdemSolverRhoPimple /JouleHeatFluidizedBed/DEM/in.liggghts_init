@@ -1,0 +1,115 @@
+#-------CoefficientFriction ----------# 
+variable muPP   equal 0.2
+variable muPW   equal 0.3
+variable muWW   equal 0.3
+
+#-------CoefficientRestituition----------#
+variable ePP   equal 0.6
+variable ePW   equal 0.6
+variable eWW   equal 0.5
+
+#-------ElectricalConduction----------#
+variable ECP   equal 5.0e3 	 #electric conductivity of particle (Graphite particles)
+variable ECW   equal 5.0e6	 #electric conductiveity of wall-conductive (SS)
+variable ECW2   equal 1e-10	 #electric conductiveity of wall-non-conductive (quartz glass)
+
+# ----- Particle Types ---
+# Type 1 - conductive	Carbon filament 0.77
+# Type 2 - non-conductive
+
+# ----- wall Types ---
+# Type 3 - conductive	
+# Type 4 - non-conductive  quartz glass
+
+# ----- Coarse graining ------
+variable cg equal 2
+
+
+echo            both
+log             ../DEM/log.liggghts
+thermo_log      ../DEM/post/thermo.txt
+
+atom_style      granular
+atom_modify     map array
+communicate     single vel yes
+coarsegraining  ${cg} 
+
+boundary        m m m
+newton          off
+
+units           si
+processors      * * *
+
+region          reg block -0.04 0.04 0 0.01 0.0 0.19 units box
+create_box      4 reg 								
+
+neighbor        0.001 bin
+neigh_modify    delay 0
+
+
+# Material properties required for granular pair styles
+
+fix         m1 all property/global youngsModulus peratomtype 5.0e6  5.0e6  7.0e6  7.0e6
+fix         m2 all property/global poissonsRatio peratomtype  0.20   0.20   0.30    0.30
+fix         m3 all property/global coefficientRestitution peratomtypepair 4 ${ePP} ${ePP} ${ePW} ${ePW} ${ePP} ${ePP} ${ePW} ${ePW} ${ePW} ${ePW} ${eWW} ${eWW} ${ePW} ${ePW} ${eWW} ${eWW}
+fix         m4 all property/global coefficientFriction peratomtypepair 4 ${muPP} ${muPP} ${muPW} ${muPW} ${muPP} ${muPP} ${muPW} ${muPW} ${muPW} ${muPW} ${muWW} ${muWW} ${muPW} ${muPW} ${muWW} ${muWW}
+fix	    m5 all property/global youngsModulusOriginal peratomtype 5.0e7  5.0e7  7.0e10  7.0e10
+fix         m6 all property/global electricalConductivity peratomtype ${ECP} ${ECP} ${ECW} ${ECW2}  #Ohm
+
+fix	    m7 all property/global epsilonP scalar 12.5 
+fix	    m8 all property/global epsilonG scalar 1.00054 
+fix 	    m9 all property/global thermalEmissivity peratomtype 0.77 0.77 0.77 0.93		#Assuming graphite filament for both particles and electrode
+
+fix	    eP all property/atom eP scalar yes yes no 0.0 		#electricPotential of particles
+fix  	    qj all property/atom jouleHeat scalar yes yes no 0.0
+fix	    cMatrix all property/atom cMatrix scalar yes yes no 0.0
+fix	    pwEP all property/atom pwEP scalar yes yes no 0.0
+fix	    pwER all property/atom pwER scalar yes yes no 0.0
+# pair style
+pair_style  gran model hertz tangential history # Hertzian without cohesion
+
+pair_coeff  * *
+
+# timestep, gravity
+timestep    0.00001
+fix         gravi all gravity 9.81 vector 0.0 0.0 -1.0
+
+
+fix	cad0 all mesh/surface file meshes/reactor2D.stl type 4 scale 1 temperature 298 
+fix	cad1 all mesh/surface file meshes/centerElectrode.stl type 3 scale 1 temperature 298 electricPotential 60.0
+fix	cad2 all mesh/surface file meshes/sideElectrodes.stl type 3 scale 1 temperature 298 electricPotential 0.0 #1 only one
+#fix	cad3 all mesh/surface file meshes/rightwall.stl type 3 scale 1 temperature 298 electricPotential 0.0
+
+fix	inface all mesh/surface file meshes/insertPlate.stl type 4 scale 1 temperature 298 
+
+fix	geometry all wall/gran model hertz tangential history mesh n_meshes 3 meshes cad0 cad1 cad2
+
+# heat transfer
+fix	ftco all property/global thermalConductivity peratomtype 168 168 168.0 1.38					# lambda in [W/(K*m)]
+fix	ftca all property/global thermalCapacity peratomtype 1000.0 1000.0 1000.0 749.0 					# cp in [J/(kg*K)]
+
+fix 	heattransfer all heat/gran/conduction initial_temperature 298 
+
+# particle distributions and insertion
+fix     pts1 all particletemplate/sphere 15485863 atom_type 1 density constant 2060 radius constant 175e-6 
+fix     pts2 all particletemplate/sphere 32452867 atom_type 2 density constant 2060 radius constant 175e-6
+fix     pdd1 all particledistribution/discrete 15485867 2 pts1 1.0 pts2 0.0
+
+fix    ins all insert/stream seed 49979687 distributiontemplate pdd1 mass 0.02 massrate 0.25 insert_every 1000 overlapcheck yes all_in no vel constant 0.0 0.0 -1. insertion_face inface #extrude_length 0.01 
+
+# apply nve integration to all particles that are inserted as single particles
+fix     integr all nve/sphere
+
+# screen output
+compute         rke all erotate/sphere
+thermo_style    custom step atoms ke c_rke vol
+thermo          1000
+thermo_modify   lost ignore norm no
+compute_modify  thermo_temp dynamic yes
+
+# insert the first particles so that dump is not empty
+run         1
+dump        dmpvtk all custom/vtk 1000 post/dump_liggghts_init*.vtk id x y z radius mass f_Temp[0] f_heatSource[0] f_cMatrix[0] f_qj[0] f_pwEP[0] f_pwER[0] 
+
+run         35000 upto
+write_restart   post/restart/liggghts.restart

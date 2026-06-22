@@ -1,0 +1,87 @@
+echo            both
+log             ../DEM/log.liggghts
+thermo_log      ../DEM/post/thermo.txt
+
+atom_style      granular
+atom_modify     map array
+communicate     single vel yes
+
+boundary        m m m
+newton          off
+
+units           si
+processors      1 1 1
+
+#region          reg block -0.025 0.025 -0.025 0.025 0.0 0.11 units box
+region 	reg cylinder z 0 0 0.024 0 0.5 units box
+create_box      3 reg
+
+neighbor        0.01 bin
+neigh_modify    delay 0
+
+
+# Material properties required for granular pair styles
+
+fix 		m1 all property/global youngsModulus peratomtype 1.9e8 1.9e8 1.9e8  #5e6 
+fix 		m2 all property/global poissonsRatio peratomtype 0.27 0.27 0.27
+fix 		m3 all property/global coefficientRestitution peratomtypepair 3 0.98 0.98 0.98 0.98 0.98 0.98 0.98 0.98 0.98 #0.45 #0.98
+fix 		m4 all property/global coefficientFriction peratomtypepair 3 0.1 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 #0.1 0.3 0.3 0.1
+fix		m5 all property/global kn peratomtypepair 3 2e5 2e5 2e5 2e5 2e5 2e5 2e5 2e5 2e5 
+fix		m6 all property/global kt peratomtypepair 3 1e5 1e5 1e5 1e5 1e5 1e5 1e5 1e5 1e5
+fix		m7 all property/global gamman peratomtypepair 3 600 600 600 600 600 600 600 600 600
+fix		m8 all property/global gammat peratomtypepair 3 600 600 600 600 600 600 600 600 600
+fix         	m9 all property/global electricalConductivity peratomtype 4.28e6 4.28e6 1e-10	 #Ohm
+fix	    	m10 all property/global thermalEmissivity peratomtype 0.8 0.8 0.6 #Ohm.m
+fix 	    	m11 all property/global electricalAspotFraction peratomtype 1.0 1.0 1.0
+
+fix	   	eP all property/atom eP scalar yes yes no 0.0 		#electricPotential of particles
+fix  	    	qj all property/atom jouleHeat scalar yes yes no 0.0
+fix	    	cMatrix all property/atom cMatrix scalar yes yes no 0.0
+fix	    	pwEP all property/atom pwEP scalar yes yes no 0.0
+fix	    	pwER all property/atom pwER scalar yes yes no 0.0
+
+# pair style
+pair_style  gran model hertz tangential history # Hertzian without cohesion
+
+pair_coeff  * *
+
+# timestep, gravity
+timestep    0.00005
+fix         gravi all gravity 9.81 vector 0.0 0.0 -1.0
+
+# walls
+fix	cad1 all mesh/surface file ../DEM/wall_cyl.stl type 3 scale 1 temperature 296
+fix	cad2 all mesh/surface file ../DEM/bottom_plate.stl type 2 scale 1 temperature 296 electricPotential 0
+fix	cad3 all mesh/surface file ../DEM/top_plate.stl type 2 scale 1 temperature 296 electricPotential 1 move 0. 0. 0.
+fix	geometry all wall/gran model hertz tangential history mesh n_meshes 3 meshes cad1 cad2 cad3
+
+# heat transfer
+fix	ftco all property/global thermalConductivity peratomtype 43. 43. 0.8.# lambda in [W/(K*m)]
+fix	ftca all property/global thermalCapacity peratomtype 448. 448. 840 # cp in [J/(kg*K)]
+fix	electransfer all heat/gran/electric initial_temperature 296 initial_electricPotential 0. start_time 0.0 radiation no
+
+# particle distributions and insertion
+region  bc block -0.02 0.02 -0.02 0.02 0 0.11 units box
+fix     pts1 all particletemplate/sphere 15485863 atom_type 1 density constant 7800 radius constant 0.00635
+fix     pdd1 all particledistribution/discrete 15485867 1 pts1 1. 
+
+fix    ins all insert/stream seed 32452867 distributiontemplate pdd1 &
+       nparticles 86 particlerate 10 insert_every 5000 overlapcheck yes all_in no vel constant 0.0 0.0 -0.8 &
+       insertion_face cad3 
+
+# apply nve integration to all particles that are inserted as single particles
+fix     integr all nve/sphere
+
+# screen output
+compute         rke all erotate/sphere
+thermo_style    custom step atoms ke c_rke vol
+thermo          1000
+thermo_modify   lost ignore norm no
+compute_modify  thermo_temp dynamic yes
+
+# insert the first particles so that dump is not empty
+run         1
+dump        dmpvtk all custom/vtk 1000 post/dump_liggghts_init*.vtk id x y z radius mass f_Temp[0] f_heatFlux[0] f_heatSource[0] #f_pwEP[0] f_pwER[0] f_eP[0] f_qr[0] f_qj[0] 
+
+run         200000 upto
+write_restart   post/restart/liggghts.restart

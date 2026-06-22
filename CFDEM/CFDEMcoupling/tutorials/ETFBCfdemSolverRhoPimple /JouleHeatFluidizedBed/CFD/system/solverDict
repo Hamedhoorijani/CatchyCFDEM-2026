@@ -1,0 +1,85 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  4.1                                   |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      solverDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+asymsolversettings_
+{
+	solver          GAMG;
+	smoother        DILU;//DILUGaussSeidel;
+	
+    nPreSweeps      0; // default: 0
+	preSweepsLevelMultiplier 1; // default: 1
+	maxPreSweeps    4; // default: 4
+	nPostSweeps     2; // default: 2
+	postSweepsLevelMultiplier 1; // default: 1
+	maxPostSweeps   4; // default: 4
+	nFinestSweeps   2; // default: 2
+	
+	cacheAgglomeration true; // default: true
+	nCellsInCoarsestLevel 400; // default: 10, B.Kong: sqrt(nCells)
+}
+
+asymsolversettings
+{
+	solver          smoothSolver;
+	smoother        symGaussSeidel;
+	nSweeps			3;
+}
+
+symsolversettingsp
+{
+	solver          PCG;
+	preconditioner  DIC;
+}
+
+symsolversettings
+{
+	solver          GAMG;
+	smoother        DIC;//DICGaussSeidel;
+	
+    nPreSweeps      0; // default: 0
+	preSweepsLevelMultiplier 1; // default: 1
+	maxPreSweeps    4; // default: 4
+	nPostSweeps     2; // default: 2
+	postSweepsLevelMultiplier 1; // default: 1
+	maxPostSweeps   4; // default: 4
+	nFinestSweeps   2; // default: 2
+	
+	cacheAgglomeration      true; // default: true
+	nCellsInCoarsestLevel   150; // default: 10, B.Kong: sqrt(nCells)
+}
+
+symsolversettings_
+{
+	solver              PCG;
+	preconditioner
+	{
+		preconditioner	GAMG;
+		smoother        DIC;
+	
+		nPreSweeps      0; // default: 0
+		preSweepsLevelMultiplier 1; // default: 1
+		maxPreSweeps    4; // default: 4
+		nPostSweeps     2; // default: 2
+		postSweepsLevelMultiplier 1; // default: 1
+		maxPostSweeps   4; // default: 4
+		nFinestSweeps   2; // default: 2
+		
+		cacheAgglomeration      true; // default: true
+		nCellsInCoarsestLevel   150; // default: 10, B.Kong: sqrt(nCells)
+	}
+}
+
+// ************************************************************************* //
