@@ -1,9 +1,10 @@
 # README for catchyCFDEM
 catchyFOAM: Laurien Vandewalle, August 2020
-catchyCFDEM-v1.0 : Florian Wéry (), January 2024 
+catchyCFDEM-v1.0: Florian Wéry, January 2024
 
-This is an adapted version of the original catchyCFDEM (catchyCFDEM (CATCHY = CATalytic CHemistrY) is an extension of the catchyFOAM framework) directory, authored by Hamed Hoorijani.  Up to date installation instructions to be written.
-This update includes the dynamic particle electric conduction and joule heating within electrified particulate systems by integerating search algorithms within the previously released version of catchyCFDEM by Florian Wery. 
+This is an adapted version of the original catchyCFDEM directory. catchyCFDEM (CATCHY = CATalytic CHemistrY) is an extension of the catchyFOAM framework. This adapted version was authored by Hamed Hoorijani. Up-to-date installation instructions will be added.
+
+This update incorporates dynamic particle electric conduction and Joule heating for electrified particulate systems by integrating search algorithms into the previously released version of catchyCFDEM by Florian Wéry.
 
 ## Installation prerequisites
 catchyFOAM (CATCHY = CATalytic CHemistrY) provides a set of OpenFOAM libraries, solvers and utilities for problems involving heterogeneous catalytic chemistry.<br/><br/>
