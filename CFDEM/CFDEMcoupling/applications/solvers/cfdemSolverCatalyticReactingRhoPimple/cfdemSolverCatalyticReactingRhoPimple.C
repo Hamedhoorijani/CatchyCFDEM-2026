@@ -103,7 +103,6 @@ int main(int argc, char *argv[])
         Info << "update Ksl.internalField()" << endl;
         Ksl = particleCloud.momCoupleM(0).impMomSource();
         Ksl.correctBoundaryConditions();
-
         #include "solverDebugInfo.H"
         particleCloud.clockM().stop("Coupling");
 

@@ -52,6 +52,7 @@ maxCo           0.4;
 functions
 {
     #includeFunc writeObjects(thermo:rho)
+    #includeFunc "outletSample"
 }
 
 // ************************************************************************* //

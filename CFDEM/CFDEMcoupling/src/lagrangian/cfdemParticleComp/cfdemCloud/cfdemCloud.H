@@ -124,7 +124,7 @@ protected:
     mutable double **Cds_;
 
     mutable double **radii_;
-
+        
     mutable double **voidfractions_;
 
     mutable double **cellIDs_;
@@ -284,7 +284,7 @@ public:
        label particleCell(int);
 
        vector position(int);
-
+       
        vector velocity(int);
 
        vector fluidVel(int);
@@ -298,6 +298,8 @@ public:
        scalar voidfraction(int);
 
        label liggghtsCommandModelIndex(word);
+
+		scalar weighting(int, int); //----------Added
 
        inline void setCG(double) const;
        

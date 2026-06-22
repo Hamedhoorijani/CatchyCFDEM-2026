@@ -15,9 +15,6 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-
-#include "../../system/caseSettings"
-
 ".*"
 {
     transport
@@ -40,13 +37,13 @@ solidSpecies
     }
     thermodynamics
     {
-        Cp          $cat_cp;
+        Cp          5.0;
         Cv          $Cp;
         Hf          0.0;
     }
     equationOfState
     {
-        rho         $cat_density;
+        rho         2950.0;
     }
 }
 

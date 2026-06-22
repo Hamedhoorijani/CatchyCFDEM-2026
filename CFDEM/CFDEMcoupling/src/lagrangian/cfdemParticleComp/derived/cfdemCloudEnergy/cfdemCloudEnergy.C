@@ -23,7 +23,7 @@ License
 #include "massTransferModel.H"
 #include "thermCondModel.H"
 #include "catalyticChemistryModel.H"
-
+#include "eModel.H"
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -44,6 +44,7 @@ cfdemCloudEnergy::cfdemCloudEnergy
     implicitEnergyModel_(false),
     massTransferModels_(couplingProperties_.lookup("massTransferModels")),
     catalyticChemistryModels_(couplingProperties_.lookup("catalyticChemistryModels")),
+    eModels_(couplingProperties_.lookup("eModels")), //Added
     energyModel_(nrEnergyModels()),
     massTransferModel_(nrMassTransferModels()),
     thermCondModel_
@@ -54,7 +55,8 @@ cfdemCloudEnergy::cfdemCloudEnergy
             *this
         )
     ),
-    catalyticChemistryModel_(nrCatalyticChemistryModels())
+    catalyticChemistryModel_(nrCatalyticChemistryModels()),
+    eModel_(nrEModels())
 {
     forAll(energyModels_, modeli)
     {
@@ -97,6 +99,23 @@ cfdemCloudEnergy::cfdemCloudEnergy
         );
         Info << "end of constructing cfdemCloudEnergy" << endl;
     }
+
+    //------------------------------Added
+    Info << "Creating new emodel" << endl;
+    forAll(eModels_, modeli)
+    {
+        eModel_.set
+        (
+            modeli,
+            eModel::New
+            (
+                couplingProperties_,
+                *this,
+                eModels_[modeli]
+            )
+        );
+        Info << "end of constructing cfdemCloudEnergy with eModel" << endl;
+    }
 }
 
 
@@ -133,6 +152,16 @@ void cfdemCloudEnergy::speciesExecute()
     }
 }
 
+void cfdemCloudEnergy::electrificationExecute() //Added
+{
+    forAll(eModel_, modeli)
+    {
+        eModel_[modeli].execute();
+    }
+}
+
+
+
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 label cfdemCloudEnergy::nrEnergyModels() const
@@ -149,6 +178,12 @@ int cfdemCloudEnergy::nrCatalyticChemistryModels()
 {
     return catalyticChemistryModels_.size();
 }
+
+int cfdemCloudEnergy::nrEModels() //Added
+{
+    return eModels_.size();
+}
+
 
 bool cfdemCloudEnergy::implicitEnergyModel() const
 {
@@ -168,6 +203,11 @@ const massTransferModel& cfdemCloudEnergy::massTransferM(int i)
 const catalyticChemistryModel& cfdemCloudEnergy::catalyticChemistryM(int i)
 {
     return catalyticChemistryModel_[i];
+}
+
+const eModel& cfdemCloudEnergy::eM(int i) //Added
+{
+    return eModel_[i];
 }
 
 const thermCondModel& cfdemCloudEnergy::thermCondM()
@@ -271,6 +311,12 @@ bool cfdemCloudEnergy::evolve
         if(verbose_) Info << "calcMassTransferContributions done." << endl;
         clockM().stop("calcMassTransferContributions");
 
+        clockM().start(30,"calcEModelContributions");	//Added
+        if(verbose_) Info << "- calcEModelContributions" << endl;
+        electrificationExecute();
+        if(verbose_) Info << "calcEModelContributions done." << endl;
+        clockM().stop("calcEModelContributions");
+
         return true;
     }
     return false;
@@ -290,6 +336,11 @@ void cfdemCloudEnergy::postFlow()
     forAll(catalyticChemistryModel_, modeli)
     {
         catalyticChemistryModel_[modeli].postFlow();
+    }
+    forAll(eModel_, modeli)	//Added
+    {	
+	Info<<"Entry to eModel postFlow function"<<endl;
+        eModel_[modeli].postFlow();
     }
 }
 

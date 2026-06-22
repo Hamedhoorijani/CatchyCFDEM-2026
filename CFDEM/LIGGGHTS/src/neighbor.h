@@ -141,6 +141,33 @@ class Neighbor : protected Pointers {
   void register_contact_dist_factor(double cdf)
   { contactDistanceFactor = std::max(contactDistanceFactor,cdf); }
 
+  double cutneighmaxsq;            // cutneighmax squared
+  int mbins;                       // # of local bins and offset
+  int mbinx,mbiny,mbinz;
+  int sx,sy,sz,smax;               // bin stencil extents
+  
+  int *bins;                       // ptr to next atom in each bin
+  int *binhead;                    // ptr to 1st atom in each bin  
+  
+  double public_bin_distance(int a, int b, int c){   // distance between binx  
+  	return bin_distance(a, b, c);
+  }
+  
+  int public_coord2bin(double *a){              // mapping atom coord to a bin
+  	return coord2bin(a);
+  }
+  
+  void public_binBorders(int a, double &b, double &c, double &d, double &e, double &f, double &g){
+  	binBorders(a,b,c,d,e,f,g);
+  }
+  
+  void public_bin2XYZ(int a, int &b, int &c, int &d){
+  	bin2XYZ(a,b,c,d);
+  }
+  
+  int public_binHop(int a, int b, int c, int d){
+  	return binHop(a, b, c, d);
+  }
  protected:
   int me,nprocs;
 
@@ -155,7 +182,7 @@ class Neighbor : protected Pointers {
 
   double **cutneighsq;             // neighbor cutneigh sq for each type pair
   double **cutneighghostsq;        // neighbor cutnsq for each ghost type pair
-  double cutneighmaxsq;            // cutneighmax squared
+  //double cutneighmaxsq;            // cutneighmax squared
   double *cuttypesq;               // cuttype squared
 
   double triggersq;                // trigger = build when atom moves this dist
@@ -170,15 +197,15 @@ class Neighbor : protected Pointers {
   double corners_hold[8][3];           // box corners at last neighbor build
 
   int nbinx,nbiny,nbinz;           // # of global bins
-  int *bins;                       // ptr to next atom in each bin
+  //int *bins;                       // ptr to next atom in each bin
   int maxbin;                      // size of bins array
 
-  int *binhead;                    // ptr to 1st atom in each bin
+  //int *binhead;                    // ptr to 1st atom in each bin
   int maxhead;                     // size of binhead array
   class MultiLevelGrid* mlg;       
 
-  int mbins;                       // # of local bins and offset
-  int mbinx,mbiny,mbinz;
+  //int mbins;                       // # of local bins and offset
+  //int mbinx,mbiny,mbinz;
   int mbinxlo,mbinylo,mbinzlo;
 
   int binsizeflag;                 // user-chosen bin size
@@ -187,7 +214,7 @@ class Neighbor : protected Pointers {
   double binsizex,binsizey,binsizez;  // actual bin sizes and inverse sizes
   double bininvx,bininvy,bininvz;
 
-  int sx,sy,sz,smax;               // bin stencil extents
+  //int sx,sy,sz,smax;               // bin stencil extents
 
   int dimension;                   // 2/3 for 2d/3d
   int triclinic;                   // 0 if domain is orthog, 1 if triclinic

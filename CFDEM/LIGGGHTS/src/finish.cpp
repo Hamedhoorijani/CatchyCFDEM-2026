@@ -719,7 +719,10 @@ void Finish::end(int flag)
 
     nneighfull = 0;
     if (m < neighbor->old_nrequest) {
-      if (neighbor->lists[m]->numneigh > 0) {
+	  auto *nl = neighbor->lists[m];
+      // numneigh is an int*; test for non-null and non-empty list
+      if (nl->numneigh != nullptr && nl->inum > 0) {
+      //if (neighbor->lists[m]->numneigh > 0) {
         int inum = neighbor->lists[m]->inum;
         int *ilist = neighbor->lists[m]->ilist;
         int *numneigh = neighbor->lists[m]->numneigh;

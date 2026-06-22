@@ -659,6 +659,14 @@ label Foam::cfdemCloud::liggghtsCommandModelIndex(word name)
     return index;
 }
 
+// ---------------------------------------Added
+scalar Foam::cfdemCloud::weighting(int index, int cellI)
+{
+	scalar wei = particleWeights()[index][cellI];
+	return wei;
+}
+
+
 std::vector< std::vector<double*> >* Foam::cfdemCloud::getVprobe()
 {
  return probeModel_->getVprobe();
@@ -864,7 +872,7 @@ bool Foam::cfdemCloud::reAllocArrays(int nP, bool forceRealloc) const
         dataExchangeM().allocateArray(expForces_,0.,3,nP);
         dataExchangeM().allocateArray(DEMForces_,0.,3,nP);
         dataExchangeM().allocateArray(Cds_,0.,1,nP);
-        dataExchangeM().allocateArray(radii_,0.,1,nP);
+		dataExchangeM().allocateArray(radii_,0.,1,nP);
         dataExchangeM().allocateArray(voidfractions_,1.,voidFractionM().maxCellsPerParticle(),nP);
         dataExchangeM().allocateArray(cellIDs_,0.,voidFractionM().maxCellsPerParticle(),nP);
         dataExchangeM().allocateArray(particleWeights_,0.,voidFractionM().maxCellsPerParticle(),nP);

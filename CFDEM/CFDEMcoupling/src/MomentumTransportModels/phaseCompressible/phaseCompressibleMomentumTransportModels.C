@@ -88,23 +88,4 @@ makeLESModel(kEqn);
 
 #include "dynamicKEqn.H"
 makeLESModel(dynamicKEqn);
-
-#include "dynamicLagrangian.H"
-makeLESModel(dynamicLagrangian);
-
-#include "kOmegaSSTDES.H"
-makeLESModel(kOmegaSSTDES);
-
-#include "SpalartAllmarasDES.H"
-makeLESModel(SpalartAllmarasDES);
-
-#include "SpalartAllmarasDDES.H"
-makeLESModel(SpalartAllmarasDDES);
-
-#include "SpalartAllmarasIDDES.H"
-makeLESModel(SpalartAllmarasIDDES);
-
-#include "DeardorffDiffStress.H"
-makeLESModel(DeardorffDiffStress);
-
 // ************************************************************************* //

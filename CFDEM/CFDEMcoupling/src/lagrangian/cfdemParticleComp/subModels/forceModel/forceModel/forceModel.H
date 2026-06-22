@@ -90,7 +90,7 @@ protected:
         bool implicitAnisotropicDrag_;  //will exchange anisotropic Ksl 
         
         bool implicitRotation_;         //will exchange rotational Ksl value
-
+        
         wordList forceSubModels_;
 
         autoPtr<forceSubModel>* forceSubModel_;
@@ -251,6 +251,7 @@ public:
         inline int nrForceSubModels() const { return forceSubModels_.size(); };
 
         void setForceSubModels(dictionary& dict);
+        
 };
 
 

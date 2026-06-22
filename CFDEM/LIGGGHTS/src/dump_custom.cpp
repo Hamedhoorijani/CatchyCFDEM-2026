@@ -1,55 +1,27 @@
 /* ----------------------------------------------------------------------
-    This is the
+   LIGGGHTS - LAMMPS Improved for General Granular and Granular Heat
+   Transfer Simulations
 
-    ██╗     ██╗ ██████╗  ██████╗  ██████╗ ██╗  ██╗████████╗███████╗
-    ██║     ██║██╔════╝ ██╔════╝ ██╔════╝ ██║  ██║╚══██╔══╝██╔════╝
-    ██║     ██║██║  ███╗██║  ███╗██║  ███╗███████║   ██║   ███████╗
-    ██║     ██║██║   ██║██║   ██║██║   ██║██╔══██║   ██║   ╚════██║
-    ███████╗██║╚██████╔╝╚██████╔╝╚██████╔╝██║  ██║   ██║   ███████║
-    ╚══════╝╚═╝ ╚═════╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝®
+   LIGGGHTS is part of the CFDEMproject
+   www.liggghts.com | www.cfdem.com
 
-    DEM simulation engine, released by
-    DCS Computing Gmbh, Linz, Austria
-    http://www.dcs-computing.com, office@dcs-computing.com
+   This file was modified with respect to the release in LAMMPS
+   Modifications are Copyright 2009-2012 JKU Linz
+                     Copyright 2012-     DCS Computing GmbH, Linz
 
-    LIGGGHTS® is part of CFDEM®project:
-    http://www.liggghts.com | http://www.cfdem.com
+   LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
+   http://lammps.sandia.gov, Sandia National Laboratories
+   Steve Plimpton, sjplimp@sandia.gov
 
-    Core developer and main author:
-    Christoph Kloss, christoph.kloss@dcs-computing.com
+   Copyright (2003) Sandia Corporation.  Under the terms of Contract
+   DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains
+   certain rights in this software.  This software is distributed under
+   the GNU General Public License.
 
-    LIGGGHTS® is open-source, distributed under the terms of the GNU Public
-    License, version 2 or later. It is distributed in the hope that it will
-    be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. You should have
-    received a copy of the GNU General Public License along with LIGGGHTS®.
-    If not, see http://www.gnu.org/licenses . See also top-level README
-    and LICENSE files.
-
-    LIGGGHTS® and CFDEM® are registered trade marks of DCS Computing GmbH,
-    the producer of the LIGGGHTS® software and the CFDEM®coupling software
-    See http://www.cfdem.com/terms-trademark-policy for details.
-
--------------------------------------------------------------------------
-    Contributing author and copyright for this file:
-    This file is from LAMMPS, but has been modified. Copyright for
-    modification:
-
-    Copyright 2012-     DCS Computing GmbH, Linz
-    Copyright 2009-2012 JKU Linz
-
-    Copyright of original file:
-    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-    http://lammps.sandia.gov, Sandia National Laboratories
-    Steve Plimpton, sjplimp@sandia.gov
-
-    Copyright (2003) Sandia Corporation.  Under the terms of Contract
-    DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains
-    certain rights in this software.  This software is distributed under
-    the GNU General Public License.
+   See the README file in the top-level directory.
 ------------------------------------------------------------------------- */
 
-#include <cmath>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include "dump_custom.h"
@@ -80,12 +52,15 @@ enum{ID,MOL,TYPE,ELEMENT,MASS,
      Q, MUX,MUY,MUZ,MU,RADIUS,DIAMETER,
      OMEGAX,OMEGAY,OMEGAZ,ANGMOMX,ANGMOMY,ANGMOMZ,
      TQX,TQY,TQZ,SPIN,ERADIUS,ERVEL,ERFORCE,
-     COMPUTE,FIX,VARIABLE,
+     COMPUTE,FIX,VARIABLE,INAME,DNAME,
      DENSITY, RHO, P,
+// superquadric start
      SHAPEX, SHAPEY, SHAPEZ,
      QUAT1, QUAT2, QUAT3, QUAT4,
      BLOCKINESS1, BLOCKINESS2,
-     INERTIAX, INERTIAY, INERTIAZ}; 
+     INERTIAX, INERTIAY, INERTIAZ,
+// superquadric end
+     THREAD}; //NP modified C.K. included DENSITY .. A.A. included RHO and P .. R.B. included THREAD
 enum{LT,LE,GT,GE,EQ,NEQ};
 enum{INT,DOUBLE,STRING};    // same as in DumpCFG
 
@@ -136,6 +111,10 @@ DumpCustom::DumpCustom(LAMMPS *lmp, int narg, char **arg) :
   variable = NULL;
   vbuf = NULL;
 
+  ncustom = 0;
+  id_custom = NULL;
+  flag_custom = NULL;
+
   // process attributes
   // ioptional = start of additional optional args
   // only dump image style processes optional args
@@ -183,7 +162,7 @@ DumpCustom::DumpCustom(LAMMPS *lmp, int narg, char **arg) :
     strcat(columns," ");
   }
 
-  label = NULL; 
+  label = NULL; //NP modified C.K.
 }
 
 /* ---------------------------------------------------------------------- */
@@ -214,6 +193,10 @@ DumpCustom::~DumpCustom()
   for (int i = 0; i < nvariable; i++) memory->destroy(vbuf[i]);
   delete [] vbuf;
 
+  for (int i = 0; i < ncustom; i++) delete [] id_custom[i];
+  memory->sfree(id_custom);
+  delete [] flag_custom;
+
   memory->destroy(choose);
   memory->destroy(dchoose);
   memory->destroy(clist);
@@ -225,7 +208,7 @@ DumpCustom::~DumpCustom()
 
   for (int i = 0; i < size_one; i++) delete [] vformat[i];
   delete [] vformat;
-  delete [] label; 
+  delete [] label; //NP modified C.K.
   delete [] columns;
 }
 
@@ -311,6 +294,13 @@ void DumpCustom::init_style()
     variable[i] = ivariable;
   }
 
+  int icustom;
+  for (int i = 0; i < ncustom; i++) {
+    icustom = atom->find_custom(id_custom[i],flag_custom[i]);
+    if (icustom < 0)
+      error->all(FLERR,"Could not find custom per-atom property ID");
+  }
+
   // set index and check validity of region
 
   if (iregion >= 0) {
@@ -379,7 +369,7 @@ void DumpCustom::header_item(bigint ndump)
 {
   fprintf(fp,"ITEM: TIMESTEP\n");
   fprintf(fp,BIGINT_FORMAT "\n",update->ntimestep);
-  if (label != NULL) { 
+  if (label != NULL) { //NP modified C.K.
     fprintf(fp,"ITEM: LABEL\n");
     fprintf(fp,"%s\n",label);
   }
@@ -491,7 +481,7 @@ int DumpCustom::count()
       } else if (thresh_array[ithresh] == MOL) {
         if (!atom->molecule_flag)
           error->all(FLERR,
-                     "Threshhold for an atom property that isn't allocated");
+                     "Threshold for an atom property that isn't allocated");
         int *molecule = atom->molecule;
         for (i = 0; i < nlocal; i++) dchoose[i] = molecule[i];
         ptr = dchoose;
@@ -754,18 +744,18 @@ int DumpCustom::count()
           error->all(FLERR,"Threshhold for an atom property that isn't allocated");
         ptr = atom->q;
         nstride = 1;
-      } else if (thresh_array[ithresh] == P) { 
+      } else if (thresh_array[ithresh] == P) { //NP modified C.K.
         if (!atom->p_flag)
           error->all(FLERR,"Threshhold for an atom property that isn't allocated");
         ptr = atom->p;
         nstride = 1;
-      } else if (thresh_array[ithresh] == RHO) { 
+      } else if (thresh_array[ithresh] == RHO) { //NP modified C.K.
         if (!atom->rho_flag)
           error->all(FLERR,
                      "Threshhold for an atom property that isn't allocated");
         ptr = atom->rho;
         nstride = 1;
-      } else if (thresh_array[ithresh] == DENSITY) { 
+      } else if (thresh_array[ithresh] == DENSITY) { //NP modified C.K.
         if (!atom->density_flag)
           error->all(FLERR,"Threshhold for an atom property that isn't allocated");
         ptr = atom->density;
@@ -915,7 +905,31 @@ int DumpCustom::count()
         i = nfield + ithresh;
         ptr = vbuf[field2index[i]];
         nstride = 1;
+
+      } else if (thresh_array[ithresh] == DNAME) {
+        int iwhich,tmp;
+        i = nfield + ithresh;
+        iwhich = atom->find_custom(id_custom[field2index[i]],tmp);
+        ptr = atom->dvector[iwhich];
+        nstride = 1;
+
+      } else if (thresh_array[ithresh] == INAME) {
+        int iwhich,tmp;
+        i = nfield + ithresh;
+        iwhich = atom->find_custom(id_custom[field2index[i]],tmp);
+
+        int *ivector = atom->ivector[iwhich];
+        for (i = 0; i < nlocal; i++)
+          dchoose[i] = ivector[i];
+        ptr = dchoose;
+        nstride = 1;
       }
+      /*else if (thresh_array[ithresh] == THREAD) {
+        int *thread = atom->thread;
+        for (i = 0; i < nlocal; i++) dchoose[i] = thread[i];
+        ptr = dchoose;
+        nstride = 1;
+      }*/
 
       // unselect atoms that don't meet threshhold criterion
 
@@ -1054,7 +1068,7 @@ int DumpCustom::parse_fields(int narg, char **arg)
     if (strcmp(arg[iarg],"id") == 0) {
       pack_choice[i] = &DumpCustom::pack_id;
       vtype[i] = INT;
-    } else if (strcmp(arg[iarg],"mol") == 0 || strcmp(arg[iarg],"id_multisphere") == 0) {
+    } else if (strcmp(arg[iarg],"mol") == 0) {
       if (!atom->molecule_flag)
         error->all(FLERR,"Dumping an atom property that isn't allocated");
       pack_choice[i] = &DumpCustom::pack_molecule;
@@ -1260,11 +1274,15 @@ int DumpCustom::parse_fields(int narg, char **arg)
         error->all(FLERR,"Dumping an atom quantity that isn't allocated");
       pack_choice[i] = &DumpCustom::pack_erforce;
       vtype[i] = DOUBLE;
+    /*} else if (strcmp(arg[iarg],"thread") == 0) {
+      pack_choice[i] = &DumpCustom::pack_thread;
+      vtype[i] = INT;*/
 
     // compute value = c_ID
     // if no trailing [], then arg is set to 0, else arg is int between []
 
-    } else if (strcmp(arg[iarg],"shapex") == 0) { 
+// superquadric start
+    } else if (strcmp(arg[iarg],"shapex") == 0) {
       if (!atom->superquadric_flag)
         error->all(FLERR,"Dumping an atom quantity that isn't allocated");
       pack_choice[i] = &DumpCustom::pack_shapex;
@@ -1299,14 +1317,14 @@ int DumpCustom::parse_fields(int narg, char **arg)
         error->all(FLERR,"Dumping an atom quantity that isn't allocated");
       pack_choice[i] = &DumpCustom::pack_quat4;
       vtype[i] = DOUBLE;
-    } else if (strcmp(arg[iarg],"blockiness1") == 0 or strcmp(arg[iarg],"roundness1") == 0) {
+    } else if (strcmp(arg[iarg],"blockiness1") == 0 || strcmp(arg[iarg],"roundness1") == 0) {
       if (!atom->superquadric_flag)
         error->all(FLERR,"Dumping an atom quantity that isn't allocated");
       if(strcmp(arg[iarg],"roundness1") == 0)
         error->warning(FLERR,"Keyword 'roundness1' will be deprecated in future, please use 'blockiness1' istead");
       pack_choice[i] = &DumpCustom::pack_blockiness1;
       vtype[i] = DOUBLE;
-    } else if (strcmp(arg[iarg],"blockiness2") == 0 or strcmp(arg[iarg],"roundness2") == 0) {
+    } else if (strcmp(arg[iarg],"blockiness2") == 0 || strcmp(arg[iarg],"roundness2") == 0) {
       if (!atom->superquadric_flag)
         error->all(FLERR,"Dumping an atom quantity that isn't allocated");
       if(strcmp(arg[iarg],"roundness2") == 0)
@@ -1328,6 +1346,7 @@ int DumpCustom::parse_fields(int narg, char **arg)
         error->all(FLERR,"Dumping an atom quantity that isn't allocated");
       pack_choice[i] = &DumpCustom::pack_inertiaz;
       vtype[i] = DOUBLE;
+// superquadric end
     } else if (strncmp(arg[iarg],"c_",2) == 0) {
       pack_choice[i] = &DumpCustom::pack_compute;
       vtype[i] = DOUBLE;
@@ -1415,6 +1434,50 @@ int DumpCustom::parse_fields(int narg, char **arg)
       field2index[i] = add_variable(suffix);
       delete [] suffix;
 
+    // custom per-atom floating point value = d_ID
+
+    } else if (strncmp(arg[iarg],"d_",2) == 0) {
+      pack_choice[i] = &DumpCustom::pack_custom;
+      vtype[i] = DOUBLE;
+
+      int n = strlen(arg[iarg]);
+      char *suffix = new char[n];
+      strcpy(suffix,&arg[iarg][2]);
+      argindex[i] = 0;
+
+      int tmp = -1;
+      n = atom->find_custom(suffix,tmp);
+      if (n < 0)
+        error->all(FLERR,"Could not find custom per-atom property ID");
+
+      if (tmp != 1)
+        error->all(FLERR,"Custom per-atom property ID is not floating point");
+
+      field2index[i] = add_custom(suffix,1);
+      delete [] suffix;
+
+    // custom per-atom integer value = i_ID
+
+    } else if (strncmp(arg[iarg],"i_",2) == 0) {
+      pack_choice[i] = &DumpCustom::pack_custom;
+      vtype[i] = INT;
+
+      int n = strlen(arg[iarg]);
+      char *suffix = new char[n];
+      strcpy(suffix,&arg[iarg][2]);
+      argindex[i] = 0;
+
+      int tmp = -1;
+      n = atom->find_custom(suffix,tmp);
+      if (n < 0)
+        error->all(FLERR,"Could not find custom per-atom property ID");
+
+      if (tmp != 0)
+        error->all(FLERR,"Custom per-atom property ID is not integer");
+
+      field2index[i] = add_custom(suffix,0);
+      delete [] suffix;
+
     } else return iarg;
   }
 
@@ -1500,6 +1563,34 @@ int DumpCustom::add_variable(char *id)
   return nvariable-1;
 }
 
+/* ----------------------------------------------------------------------
+   add custom atom property to list used by dump
+   return index of where this property is in list
+   if already in list, do not add, just return index, else add to list
+------------------------------------------------------------------------- */
+
+int DumpCustom::add_custom(char *id, int flag)
+{
+  int icustom;
+  for (icustom = 0; icustom < ncustom; icustom++)
+    if ((strcmp(id,id_custom[icustom]) == 0)
+        && (flag == flag_custom[icustom])) break;
+  if (icustom < ncustom) return icustom;
+
+  id_custom = (char **)
+    memory->srealloc(id_custom,(ncustom+1)*sizeof(char *),"dump:id_custom");
+  flag_custom = (int *)
+    memory->srealloc(flag_custom,(ncustom+1)*sizeof(int),"dump:flag_custom");
+
+  int n = strlen(id) + 1;
+  id_custom[ncustom] = new char[n];
+  strcpy(id_custom[ncustom],id);
+  flag_custom[ncustom] = flag;
+
+  ncustom++;
+  return ncustom-1;
+}
+
 /* ---------------------------------------------------------------------- */
 
 int DumpCustom::modify_param(int narg, char **arg)
@@ -1519,7 +1610,7 @@ int DumpCustom::modify_param(int narg, char **arg)
     return 2;
   }
 
-  if (strcmp(arg[0],"label") == 0) { 
+  if (strcmp(arg[0],"label") == 0) { //NP modified C.K.
      if (narg < 2) error->all(FLERR,"Illegal dump_modify command [label]");
      delete [] label;
      int n = strlen(arg[1]) + 1;
@@ -1574,7 +1665,7 @@ int DumpCustom::modify_param(int narg, char **arg)
     // customize by adding to if statement
 
     if (strcmp(arg[1],"id") == 0) thresh_array[nthresh] = ID;
-    else if (strcmp(arg[1],"mol") == 0 || strcmp(arg[1],"id_multisphere") == 0) thresh_array[nthresh] = MOL;
+    else if (strcmp(arg[1],"mol") == 0) thresh_array[nthresh] = MOL;
     else if (strcmp(arg[1],"type") == 0) thresh_array[nthresh] = TYPE;
     else if (strcmp(arg[1],"mass") == 0) thresh_array[nthresh] = MASS;
 
@@ -1632,9 +1723,10 @@ int DumpCustom::modify_param(int narg, char **arg)
     else if (strcmp(arg[1],"fz") == 0) thresh_array[nthresh] = FZ;
 
     else if (strcmp(arg[1],"q") == 0) thresh_array[nthresh] = Q;
-    else if (strcmp(arg[1],"density") == 0) thresh_array[nthresh] = DENSITY; 
-    else if (strcmp(arg[1],"p") == 0) thresh_array[nthresh] = P; 
-    else if (strcmp(arg[1],"rho") == 0) thresh_array[nthresh] = RHO; 
+    else if (strcmp(arg[1],"density") == 0) thresh_array[nthresh] = DENSITY; //NP modified C.K.
+    else if (strcmp(arg[1],"p") == 0) thresh_array[nthresh] = P; //NP modified C.K.
+    else if (strcmp(arg[1],"rho") == 0) thresh_array[nthresh] = RHO; //NP modified C.K.
+    //else if (strcmp(arg[1],"thread") == 0) thresh_array[nthresh] = THREAD; //NP modified R.B.
     else if (strcmp(arg[1],"mux") == 0) thresh_array[nthresh] = MUX;
     else if (strcmp(arg[1],"muy") == 0) thresh_array[nthresh] = MUY;
     else if (strcmp(arg[1],"muz") == 0) thresh_array[nthresh] = MUZ;
@@ -1656,7 +1748,8 @@ int DumpCustom::modify_param(int narg, char **arg)
     else if (strcmp(arg[1],"eradius") == 0) thresh_array[nthresh] = ERADIUS;
     else if (strcmp(arg[1],"ervel") == 0) thresh_array[nthresh] = ERVEL;
     else if (strcmp(arg[1],"erforce") == 0) thresh_array[nthresh] = ERFORCE;
-    else if (strcmp(arg[1],"shapex") == 0) thresh_array[nthresh] = SHAPEX; 
+// superquadric start
+    else if (strcmp(arg[1],"shapex") == 0) thresh_array[nthresh] = SHAPEX;
     else if (strcmp(arg[1],"shapey") == 0) thresh_array[nthresh] = SHAPEY;
     else if (strcmp(arg[1],"shapez") == 0) thresh_array[nthresh] = SHAPEZ;
     else if (strcmp(arg[1],"quat1") == 0) thresh_array[nthresh] = QUAT1;
@@ -1668,6 +1761,7 @@ int DumpCustom::modify_param(int narg, char **arg)
     else if (strcmp(arg[1],"inertiax") == 0) thresh_array[nthresh] = INERTIAX;
     else if (strcmp(arg[1],"inertiay") == 0) thresh_array[nthresh] = INERTIAY;
     else if (strcmp(arg[1],"inertiaz") == 0) thresh_array[nthresh] = INERTIAZ;
+// superquadric end
 
     // compute value = c_ID
     // if no trailing [], then arg is set to 0, else arg is between []
@@ -1769,6 +1863,48 @@ int DumpCustom::modify_param(int narg, char **arg)
       field2index[nfield+nthresh] = add_variable(suffix);
       delete [] suffix;
 
+    // custom per atom floating point value = d_ID
+    // must grow field2index and argindex arrays, since access is beyond nfield
+
+    } else if (strncmp(arg[1],"d_",2) == 0) {
+      thresh_array[nthresh] = DNAME;
+      memory->grow(field2index,nfield+nthresh+1,"dump:field2index");
+      memory->grow(argindex,nfield+nthresh+1,"dump:argindex");
+      int n = strlen(arg[1]);
+      char *suffix = new char[n];
+      strcpy(suffix,&arg[1][2]);
+      argindex[nfield+nthresh] = 0;
+
+      int tmp = -1;
+      n = atom->find_custom(suffix,tmp);
+      if ((n < 0) || (tmp != 1))
+        error->all(FLERR,"Could not find dump modify "
+                   "custom atom floating point property ID");
+
+      field2index[nfield+nthresh] = add_custom(suffix,1);
+      delete [] suffix;
+
+    // custom per atom integer value = i_ID
+    // must grow field2index and argindex arrays, since access is beyond nfield
+
+    } else if (strncmp(arg[1],"i_",2) == 0) {
+      thresh_array[nthresh] = INAME;
+      memory->grow(field2index,nfield+nthresh+1,"dump:field2index");
+      memory->grow(argindex,nfield+nthresh+1,"dump:argindex");
+      int n = strlen(arg[1]);
+      char *suffix = new char[n];
+      strcpy(suffix,&arg[1][2]);
+      argindex[nfield+nthresh] = 0;
+
+      int tmp = -1;
+      n = atom->find_custom(suffix,tmp);
+      if ((n < 0) || (tmp != 0))
+        error->all(FLERR,"Could not find dump modify "
+                   "custom atom integer property ID");
+
+      field2index[nfield+nthresh] = add_custom(suffix,0);
+      delete [] suffix;
+
     } else error->all(FLERR,"Invalid dump_modify threshhold operator");
 
     // set operation type of threshhold
@@ -1861,6 +1997,34 @@ void DumpCustom::pack_variable(int n)
   for (int i = 0; i < nchoose; i++) {
     buf[n] = vector[clist[i]];
     n += size_one;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+
+void DumpCustom::pack_custom(int n)
+{
+
+  int index = field2index[n];
+
+  if (flag_custom[index] == 0) { // integer
+    int iwhich,tmp;
+    iwhich = atom->find_custom(id_custom[index],tmp);
+
+    int *ivector = atom->ivector[iwhich];
+    for (int i = 0; i < nchoose; i++) {
+      buf[n] = ivector[clist[i]];
+      n += size_one;
+    }
+  } else if (flag_custom[index] == 1) { // double
+    int iwhich,tmp;
+    iwhich = atom->find_custom(id_custom[index],tmp);
+
+    double *dvector = atom->dvector[iwhich];
+    for (int i = 0; i < nchoose; i++) {
+      buf[n] = dvector[clist[i]];
+      n += size_one;
+    }
   }
 }
 
@@ -2399,7 +2563,7 @@ void DumpCustom::pack_q(int n)
 
 /* ---------------------------------------------------------------------- */
 
-void DumpCustom::pack_density(int n) 
+void DumpCustom::pack_density(int n) //NP modified C.K.
 {
   double *density = atom->density;
 
@@ -2412,7 +2576,7 @@ void DumpCustom::pack_density(int n)
 
 /* ---------------------------------------------------------------------- */
 
-void DumpCustom::pack_p(int n) 
+void DumpCustom::pack_p(int n) //NP modified C.K.
 {
   double *p = atom->p;
 
@@ -2424,7 +2588,7 @@ void DumpCustom::pack_p(int n)
 
 /* ---------------------------------------------------------------------- */
 
-void DumpCustom::pack_rho(int n) 
+void DumpCustom::pack_rho(int n) //NP modified C.K.
 {
   double *rho = atom->rho;
 
@@ -2805,3 +2969,14 @@ void DumpCustom::pack_inertiaz(int n)
     n += size_one;
   }
 }
+/* ---------------------------------------------------------------------- */
+
+/*void DumpCustom::pack_thread(int n)
+{
+  int *thread = atom->thread;
+
+  for (int i = 0; i < nchoose; i++) {
+    buf[n] = comm->me * comm->nprocs + thread[clist[i]];
+    n += size_one;
+  }
+}*/

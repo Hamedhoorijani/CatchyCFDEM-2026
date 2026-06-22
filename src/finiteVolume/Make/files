@@ -1,3 +1,5 @@
 fields/fvPatchFields/interstitialUniformInletVelocity/interstitialUniformInletVelocityFvPatchVectorField.C
+fields/fvPatchFields/rotatingInletVelocity/rotatingInletVelocityFvPatchVectorField.C
+fields/fvPatchFields/rotatingWallPartialSlipVelocity/rotatingWallPartialSlipVelocityFvPatchVectorField.C
 
 LIB = $(FOAM_USER_LIBBIN)/libcatchyFiniteVolume

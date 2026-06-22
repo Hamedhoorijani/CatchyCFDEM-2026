@@ -12,7 +12,7 @@ fieldAverage1
     libs            ( "libcatchyFieldFunctionObjects.so" );
     writeControl    writeTime;
 
-    timeStart       0.3; 
+    timeStart       0.1; 
     enabled         yes;
 
     restartOnRestart    false;

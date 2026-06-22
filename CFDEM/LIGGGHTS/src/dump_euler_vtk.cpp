@@ -1,42 +1,22 @@
 /* ----------------------------------------------------------------------
-    This is the
+   LIGGGHTS - LAMMPS Improved for General Granular and Granular Heat
+   Transfer Simulations
 
-    ██╗     ██╗ ██████╗  ██████╗  ██████╗ ██╗  ██╗████████╗███████╗
-    ██║     ██║██╔════╝ ██╔════╝ ██╔════╝ ██║  ██║╚══██╔══╝██╔════╝
-    ██║     ██║██║  ███╗██║  ███╗██║  ███╗███████║   ██║   ███████╗
-    ██║     ██║██║   ██║██║   ██║██║   ██║██╔══██║   ██║   ╚════██║
-    ███████╗██║╚██████╔╝╚██████╔╝╚██████╔╝██║  ██║   ██║   ███████║
-    ╚══════╝╚═╝ ╚═════╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝®
+   LIGGGHTS is part of the CFDEMproject
+   www.liggghts.com | www.cfdem.com
 
-    DEM simulation engine, released by
-    DCS Computing Gmbh, Linz, Austria
-    http://www.dcs-computing.com, office@dcs-computing.com
+   Christoph Kloss, christoph.kloss@cfdem.com
+   Copyright 2009-2012 JKU Linz
+   Copyright 2012-     DCS Computing GmbH, Linz
 
-    LIGGGHTS® is part of CFDEM®project:
-    http://www.liggghts.com | http://www.cfdem.com
+   LIGGGHTS is based on LAMMPS
+   LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
+   http://lammps.sandia.gov, Sandia National Laboratories
+   Steve Plimpton, sjplimp@sandia.gov
 
-    Core developer and main author:
-    Christoph Kloss, christoph.kloss@dcs-computing.com
+   This software is distributed under the GNU General Public License.
 
-    LIGGGHTS® is open-source, distributed under the terms of the GNU Public
-    License, version 2 or later. It is distributed in the hope that it will
-    be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. You should have
-    received a copy of the GNU General Public License along with LIGGGHTS®.
-    If not, see http://www.gnu.org/licenses . See also top-level README
-    and LICENSE files.
-
-    LIGGGHTS® and CFDEM® are registered trade marks of DCS Computing GmbH,
-    the producer of the LIGGGHTS® software and the CFDEM®coupling software
-    See http://www.cfdem.com/terms-trademark-policy for details.
-
--------------------------------------------------------------------------
-    Contributing author and copyright for this file:
-    (if not contributing author is listed, this file has been contributed
-    by the core developer)
-
-    Copyright 2012-     DCS Computing GmbH, Linz
-    Copyright 2009-2012 JKU Linz
+   See the README file in the top-level directory.
 ------------------------------------------------------------------------- */
 
 #include <string.h>
@@ -65,7 +45,38 @@ DumpEulerVTK::DumpEulerVTK(LAMMPS *lmp, int narg, char **arg) : Dump(lmp, narg, 
   buf_all_(0)
 {
   if (narg < 5)
-    error->all(FLERR,"Illegal dump pic/vtk command");
+    error->all(FLERR,"Illegal dump euler/vtk command");
+
+  fix_euler_name_ = NULL;
+  cell_center=true;
+
+  int iarg = 5;
+  while (iarg < narg) {
+    if (strcmp(arg[iarg], "ave_euler") == 0) {
+      if (iarg + 1 >= narg)
+        error->all(FLERR,"missing argument");
+      ++iarg;
+      int n = strlen(arg[iarg]) + 1;
+      fix_euler_name_ = new char[n];
+      strcpy(fix_euler_name_,arg[iarg]);
+      ++iarg;
+    } else if (strcmp(arg[iarg], "cell_center") == 0) {
+      if (iarg + 1 >= narg)
+        error->all(FLERR,"missing argument");
+      ++iarg;
+      if (strcmp(arg[iarg], "yes") == 0) {
+        cell_center = true;
+      } else if (strcmp(arg[iarg], "no") == 0) {
+        cell_center = false;
+      } else {
+        error->all(FLERR,"expecting 'yes' or 'no' after cell_center");;
+      }
+      ++iarg;
+    } else {
+      error->all(FLERR,"illegal argument");;
+    }
+
+  }
 
   // CURRENTLY ONLY PROC 0 writes
 
@@ -76,13 +87,20 @@ DumpEulerVTK::DumpEulerVTK(LAMMPS *lmp, int narg, char **arg) : Dump(lmp, narg, 
 
 DumpEulerVTK::~DumpEulerVTK()
 {
+  delete fix_euler_name_;
 }
 
 /* ---------------------------------------------------------------------- */
 
 void DumpEulerVTK::init_style()
 {
-  fix_euler_ = static_cast<FixAveEuler*>(modify->find_fix_style_strict("ave/euler",0));
+  if (fix_euler_name_) {
+    fix_euler_ = static_cast<FixAveEuler*>(modify->find_fix_id(fix_euler_name_));
+  }
+  if(!fix_euler_) {
+    if (fix_euler_name_) error->warning(FLERR, "dump euler/vtk failed to find named fix ave/euler*");
+    fix_euler_ = static_cast<FixAveEuler*>(modify->find_fix_style("ave/euler",0));
+  }
   if(!fix_euler_)
     error->all(FLERR,"Illegal dump euler/vtk command, need a fix ave/euler");
 
@@ -94,12 +112,27 @@ void DumpEulerVTK::init_style()
     error->all(FLERR,"Your 'dump euler/vtk' command is writing one file per processor, where all the files contain the same data");
 
 //  if (domain->triclinic == 1)
-//    error->all(FLERR,"Can not dump VTK files for triclinic box");
+//    error->all(FLERR,"Cannot dump VTK files for triclinic box");
   if (binary)
-    error->all(FLERR,"Can not dump VTK files in binary mode");
+    error->all(FLERR,"Cannot dump VTK files in binary mode");
 
-  // node center (3), av vel (3), volume fraction, stress, radius
-  size_one = 9;
+  /*if (cell_center) {
+    // node center (3), av vel (3), volume fraction, radius, pressure, normal and shear stresses (6)
+    size_one = 15;
+  } else {
+    if (fix_euler_->is_parallel())
+      error->all(FLERR,"Cannot dump cell information for fix ave/euler running parallel");
+
+    if (strcmp(fix_euler_->style,"ave/euler") == 0) {
+      // boxlo (3), av vel (3), volume fraction, radius, pressure, normal and shear stresses (6)
+      size_one = 15;
+    } else if (strcmp(fix_euler_->style,"ave/euler/region") == 0) {
+      // node points (24), av vel (3), volume fraction, radius, pressure, normal and shear stresses (6)
+      size_one = 36;
+    } else {
+      error->all(FLERR,"Unable to dump cells to VTK files");
+    }
+  }*/
 
   delete [] format;
 }
@@ -147,9 +180,26 @@ void DumpEulerVTK::pack(int *ids)
 
   for(int i = 0; i < ncells; i++)
   {
-    buf[m++] = fix_euler_->cell_center(i,0);
-    buf[m++] = fix_euler_->cell_center(i,1);
-    buf[m++] = fix_euler_->cell_center(i,2);
+      buf[m++] = fix_euler_->cell_center(i,0);
+      buf[m++] = fix_euler_->cell_center(i,1);
+      buf[m++] = fix_euler_->cell_center(i,2);
+    /*if (cell_center) {
+
+    } else {
+      if (strcmp(fix_euler_->style,"ave/euler") == 0) {
+        buf[m++] = fix_euler_->cell_center(i,0)-0.5*fix_euler_->cell_size(0);
+        buf[m++] = fix_euler_->cell_center(i,1)-0.5*fix_euler_->cell_size(1);
+        buf[m++] = fix_euler_->cell_center(i,2)-0.5*fix_euler_->cell_size(2);
+      } else if (strcmp(fix_euler_->style,"ave/euler/region") == 0) {
+        double points[24];
+        fix_euler_->cell_points(i,points);
+        for (int j=0; j < 24; ++j) {
+          buf[m++] = points[j];
+        }
+      } else {
+        error->all(FLERR,"Unable to dump cells to VTK files");
+      }
+    }*/
 
     buf[m++] = fix_euler_->cell_v_av(i,0);
     buf[m++] = fix_euler_->cell_v_av(i,1);
@@ -158,6 +208,13 @@ void DumpEulerVTK::pack(int *ids)
     buf[m++] = fix_euler_->cell_vol_fr(i);
     buf[m++] = fix_euler_->cell_radius(i);
     buf[m++] = fix_euler_->cell_pressure(i);
+
+    buf[m++] = fix_euler_->cell_stress(i,0);
+    buf[m++] = fix_euler_->cell_stress(i,1);
+    buf[m++] = fix_euler_->cell_stress(i,2);
+    buf[m++] = fix_euler_->cell_stress(i,3);
+    buf[m++] = fix_euler_->cell_stress(i,4);
+    buf[m++] = fix_euler_->cell_stress(i,5);
   }
   return ;
 }
@@ -186,6 +243,7 @@ void DumpEulerVTK::write_data(int n, double *mybuf)
     if(n_calls_ == comm->nprocs)
         write_data_ascii(n_all_/size_one,buf_all_);
 }
+
 
 void DumpEulerVTK::write_data_ascii(int n, double *mybuf)
 {

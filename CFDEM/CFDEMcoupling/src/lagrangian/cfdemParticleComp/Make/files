@@ -23,6 +23,7 @@ energyModels = subModels/energyModel
 massTransferModels = subModels/massTransferModel
 thermCondModels = subModels/thermCondModel
 catChemistryModels = subModels/catalyticChemistryModel
+eModels = subModels/eModel
 
 $(cfdemCloud)/cfdemCloud.C
 $(derived)/cfdemCloudIB/cfdemCloudIB.C
@@ -59,6 +60,14 @@ $(forceModels)/forceModel/forceModel.C
 $(forceModels)/forceModel/newForceModel.C
 $(forceModels)/GidaspowDrag/GidaspowDrag.C
 $(forceModels)/BeetstraDrag/BeetstraDrag.C
+$(forceModels)/IgciDrag/IgciDrag.C
+$(forceModels)/MilioliDrag/MilioliDrag.C
+$(forceModels)/WenYuDrag/WenYuDrag.C
+$(forceModels)/OzelSundaresanDrag/OzelSundaresanDrag.C
+$(forceModels)/OzelDrag/OzelDrag.C
+$(forceModels)/TennetiDrag/TennetiDrag.C
+$(forceModels)/TangKuipersDrag/TangKuipersDrag.C
+$(forceModels)/TangDrag/TangDrag.C
 $(forceModels)/BeetstraPolyDrag/BeetstraPolyDrag.C
 $(forceModels)/gradPForce/gradPForce.C
 $(forceModels)/gradPForceSmooth/gradPForceSmooth.C
@@ -156,8 +165,11 @@ $(catChemistryModels)/noCatalyticChemistry/noCatalyticChemistry.C
 $(catChemistryModels)/simpleCatalyticChemistry/simpleCatalyticChemistry.C
 $(catChemistryModels)/PACatalyticChemistry/PACatalyticChemistry.C
 $(catChemistryModels)/pseudoHomCatalyticChemistry/pseudoHomCatalyticChemistry.C
-
 $(catChemistryModels)/simpleCatalyticChemistryV/simpleCatalyticChemistryV.C
 
+$(eModels)/eModel/eModel.C
+$(eModels)/eModel/newEModel.C
+$(eModels)/noEModel/noEModel.C
+$(eModels)/veFieldModel/veFieldModel.C
 
 LIB = $(CFDEM_LIB_DIR)/lib$(CFDEM_LIB_NAME)

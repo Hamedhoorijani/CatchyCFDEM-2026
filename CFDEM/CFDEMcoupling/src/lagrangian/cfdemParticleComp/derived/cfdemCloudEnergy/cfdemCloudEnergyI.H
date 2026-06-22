@@ -36,6 +36,10 @@ inline const wordList& cfdemCloudEnergy::catalyticChemistryModels() const
     return catalyticChemistryModels_;
 }
 
+inline const wordList& cfdemCloudEnergy::eModels() const   //added
+{
+    return eModels_;
+}
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

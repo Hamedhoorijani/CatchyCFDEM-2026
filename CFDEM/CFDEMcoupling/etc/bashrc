@@ -13,6 +13,9 @@ export CFDEM_PROJECT_DIR=$CFDEM_INST_DIR/CFDEMcoupling
 # LIGGGHTS
 export CFDEM_LIGGGHTS_INST_DIR=$CFDEM_INST_DIR/LIGGGHTS
 #
+# LPP
+export CFDEM_LPP_INST_DIR=$CFDEM_INST_DIR/LPP
+#
 # Path to additional libraries
 export CFDEM_ADD_LIBS_DIR=
 #
@@ -36,7 +39,7 @@ export CFDEM_SRC_DIR=$CFDEM_PROJECT_DIR/src
 export CFDEM_SOLVER_DIR=$CFDEM_PROJECT_DIR/applications/solvers
 export CFDEM_UT_DIR=$CFDEM_PROJECT_DIR/applications/utilities
 export CFDEM_TUT_DIR=$CFDEM_PROJECT_DIR/tutorials
-
+export CFDEM_LPP_DIR=$CFDEM_LPP_INST_DIR/src
 #------------------------------------------------------------------------------
 
 #- CFDEM lib name
@@ -91,6 +94,20 @@ unset cleaned foamClean cfdemOldDirs
 # Unload initialization functions:
 #------------------------------------------------------------------------------
 . $WM_PROJECT_DIR/etc/config.sh/functions
+
+
+# -----------------------------------------------------------------------------
+# Settings for lpp postprocess tool
+# -----------------------------------------------------------------------------
+
+#- nr of procs for lpp tool
+export CFDEM_LPP_NPROCS=4
+
+#- nr of procs for lpp tool
+export CFDEM_LPP_CHUNKSIZE=4
+
+#- shortcut to cfdem path
+alias lpp='python -i $CFDEM_LPP_DIR/lpp.py --cpunum $CFDEM_LPP_NPROCS --chunksize $CFDEM_LPP_CHUNKSIZE'
 
 #------------------------------------------------------------------------------
 # aliases for easy navigation (no changes necessary)

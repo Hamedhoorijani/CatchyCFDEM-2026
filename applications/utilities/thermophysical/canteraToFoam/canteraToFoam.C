@@ -286,15 +286,15 @@ int main(int argc, char *argv[])
 
             forAll(gasSpecies, i)
             {
-                ctgas_trans->getViscosityPolynomial(i, coeffs.begin());
+                ctgas_trans->getViscosityPolynomials(i, coeffs.begin());
                 Polynomial<8> muCoeffs_(coeffs);
-                ctgas_trans->getConductivityPolynomial(i, coeffs.begin());
+                ctgas_trans->getConductivityPolynomials(i, coeffs.begin());
                 Polynomial<8> kappaCoeffs_(coeffs);
 
                 List<Polynomial<8>> DkjCoeffs_(gasSpecies.size());
                 forAll(gasSpecies, j)
                 {
-                    ctgas_trans->getBinDiffusivityPolynomial(i, j, coeffs.begin());
+                    ctgas_trans->getBinDiffusivityPolynomials(i, j, coeffs.begin());
                     DkjCoeffs_[j] = Polynomial<8>(coeffs);
                 }
 

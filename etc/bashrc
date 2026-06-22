@@ -19,12 +19,12 @@
 #
 # Location of catchyFOAM files
 # Please set to the appropriate path if the default is not correct
-export CATCHY_DIR=$VSC_DATA/catchyFOAM-rome-foss-2020b
+export CATCHY_DIR=/dodrio/scratch/projects/2026_021/vsc46236/catchyFOAM-dev-milan-foss-2023a
 #
 # Location of cantera installation
 # Please set to the appropriate path if the default is not correct
 # (canteraToFoam installation is skipped when variable is empty)
-export CANTERA_DIR=
+export CANTERA_DIR=$EBROOTCANTERA
 #
 # END OF (NORMAL) USER EDITABLE PART
 ################################################################################

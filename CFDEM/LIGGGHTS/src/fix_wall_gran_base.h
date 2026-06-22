@@ -341,6 +341,11 @@ public:
     if(wg->heattransfer_flag())
        wg->addHeatFlux(mesh,ip,sidata.radi,sidata.deltan,1.);
 
+
+    if(wg->electrictransfer_flag())
+       wg->addElectricFlux(mesh,ip,sidata.radi,sidata.deltan,1.);
+    
+    
     // if force should be stored or evaluated
     if(sidata.has_force_update && (wg->store_force() || fix_mesh) )
     {

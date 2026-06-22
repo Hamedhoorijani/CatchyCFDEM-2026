@@ -76,7 +76,10 @@ FixMesh::FixMesh(LAMMPS *lmp, int narg, char **arg)
   atom_type_mesh_(-1),
   temperature_mesh_(0.),
   mass_temperature_(0.),
+  electricPotential_mesh_(0.),
+  electricMode_(false),
   trackPerElementTemp_(false),
+  trackPerElementEp_(false),
   mesh_(NULL),
   setupFlag_(false),
   pOpFlag_(false),
@@ -255,6 +258,14 @@ FixMesh::FixMesh(LAMMPS *lmp, int narg, char **arg)
           if(mass_temperature_ <= 0.)
             error->fix_error(FLERR,this,"mass_temperature > 0 expected");
           hasargs = true;
+      } else if (strcmp(arg[iarg_],"electricPotential") == 0) {
+          iarg_++;
+          electricPotential_mesh_ = atof(arg[iarg_++]);
+          electricMode_=true;
+          mesh_->prop().addGlobalProperty< ScalarContainer<double> >("electricPotential","comm_none","frame_invariant","restart_yes");
+          mesh_->prop().setGlobalProperty< ScalarContainer<double> >("electricPotential",electricPotential_mesh_);
+                 
+          hasargs = true;
       }
     }
 }
@@ -418,6 +429,7 @@ void FixMesh::create_mesh_restart(char *mesh_fname)
           fclose(test);
        }
     }
+    
 
     // set properties that are important for reading
     mesh_->setMeshID(id);
@@ -515,7 +527,13 @@ void FixMesh::setup(int vflag)
 {
     if(temperature_mesh_ > 1e-12)
         mesh_->prop().setGlobalProperty< ScalarContainer<double> >("Temp",temperature_mesh_);
-
+        
+    if(electricMode_)
+    {
+		if (!mesh_->prop().getGlobalProperty< ScalarContainer<double> >("electricPotential"))
+				mesh_->prop().addGlobalProperty< ScalarContainer<double> >("electricPotential","comm_none","frame_invariant","restart_yes");
+		mesh_->prop().setGlobalProperty< ScalarContainer<double> >("electricPotential", electricPotential_mesh_);
+	}
     mesh_->reverseComm();
 }
 
@@ -599,6 +617,15 @@ void FixMesh::final_integrate()
         mesh_->prop().setGlobalProperty< ScalarContainer<double> >("Temp",Temp_wall);
         mesh_->prop().setGlobalProperty< ScalarContainer<double> >("heatFlux",0.);
     }
+    
+
+   /* if(!has_per_element_electrictransfer && mesh_->prop().getGlobalProperty< ScalarContainer<double> >("electricPotential"))
+    {
+        double ep_wall = (*mesh_->prop().getGlobalProperty< ScalarContainer<double> >("electricPotential"))(0);
+
+        mesh_->prop().setGlobalProperty< ScalarContainer<double> >("electricPotential",ep_wall);
+    }
+   */
 }
 
 /* ---------------------------------------------------------------------- */

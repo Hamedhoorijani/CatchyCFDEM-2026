@@ -1,0 +1,183 @@
+LIGGGHTS (Version LIGGGHTS-PUBLIC 3.8.0, compiled 2024-11-07-21:55:24 by vsc46236, git commit unknown)
+Created orthogonal box = (-0.05 -0.05 0) to (0.05 0.05 0.15)
+  1 by 2 by 2 MPI processor grid
+Fix particledistribution/discrete (id pdd1): distribution based on mass%:
+    pts1: d=8.000000e-03 (max. bounding sphere) mass%=100.000000%
+Fix particledistribution/discrete (id pdd1): distribution based on number%:
+    pts1: d=8.000000e-03 (max. bounding sphere) number%=100.000000%
+Setting up run at Fri Nov  8 14:08:53 2024
+
+INFO: Resetting random generator for region bc
+INFO: Particle insertion ins: inserting every 0 steps
+Memory usage per processor = 4.27948 Mbytes
+    Step    Atoms         KinEng            rke       heattran         Volume 
+       0        0              0              0              0         0.0015 
+insertion: proc 3 at 0 %
+insertion: proc 3 at 10 %
+insertion: proc 3 at 20 %
+insertion: proc 3 at 30 %
+insertion: proc 3 at 40 %
+insertion: proc 3 at 50 %
+insertion: proc 3 at 60 %
+insertion: proc 3 at 70 %
+insertion: proc 3 at 80 %
+insertion: proc 3 at 90 %
+insertion: proc 3 at 100 %
+insertion: proc 1 at 0 %
+insertion: proc 1 at 10 %
+insertion: proc 1 at 20 %
+insertion: proc 1 at 30 %
+insertion: proc 1 at 40 %
+insertion: proc 1 at 50 %
+insertion: proc 1 at 60 %
+insertion: proc 1 at 70 %
+insertion: proc 1 at 80 %
+insertion: proc 1 at 90 %
+insertion: proc 1 at 100 %
+insertion: proc 2 at 0 %
+insertion: proc 2 at 10 %
+insertion: proc 2 at 20 %
+insertion: proc 2 at 30 %
+insertion: proc 2 at 40 %
+insertion: proc 2 at 50 %
+insertion: proc 2 at 60 %
+insertion: proc 2 at 70 %
+insertion: proc 2 at 80 %
+insertion: proc 2 at 90 %
+insertion: proc 2 at 100 %
+insertion: proc 0 at 0 %
+insertion: proc 0 at 10 %
+insertion: proc 0 at 20 %
+insertion: proc 0 at 30 %
+insertion: proc 0 at 40 %
+insertion: proc 0 at 50 %
+insertion: proc 0 at 60 %
+insertion: proc 0 at 70 %
+insertion: proc 0 at 80 %
+insertion: proc 0 at 90 %
+insertion: proc 0 at 100 %
+INFO: Particle insertion ins: inserted 890 particle templates (mass 1.908748e+00) at step 1
+ - a total of 890 particle templates (mass 1.908748e+00) inserted so far.
+       1      890    0.085963889              0      5726.2438         0.0015 
+Loop time of 0.825 on 4 procs for 1 steps with 890 atoms, finish time Fri Nov  8 14:08:54 2024
+
+
+Pair  time (%) = 1.05077e-05 (0.00127367)
+Neigh time (%) = 0.000143486 (0.0173923)
+Comm  time (%) = 0.296682 (35.9614)
+Outpt time (%) = 0.112022 (13.5784)
+Other time (%) = 0.416143 (50.4415)
+
+Nlocal:    222.5 ave 224 max 221 min
+Histogram: 1 0 0 1 0 0 1 0 0 1
+Nghost:    89 ave 92 max 87 min
+Histogram: 1 0 1 0 1 0 0 0 0 1
+Neighs:    367 ave 377 max 362 min
+Histogram: 1 1 1 0 0 0 0 0 0 1
+
+Total # of neighbors = 1468
+Ave neighs/atom = 1.64944
+Neighbor list builds = 1
+Dangerous builds = 0
+Setting up run at Fri Nov  8 14:08:56 2024
+
+Memory usage per processor = 8.40742 Mbytes
+    Step    Atoms         KinEng            rke       heattran         Volume 
+       1      890    0.085963889              0      5726.2438         0.0015 
+    1000      890     0.24298619  0.00026500536      5726.2438         0.0015 
+    2000      890     0.41425982   0.0011043421      5726.2438         0.0015 
+    3000      890     0.49740034   0.0019624222      5726.2438         0.0015 
+    4000      890     0.30999165   0.0040474964      5726.2438         0.0015 
+    5000      890    0.024527139   0.0028956031      5726.2438         0.0015 
+    6000      890      0.0065799   0.0015512065      5726.2438         0.0015 
+    7000      890   0.0060963329  0.00097771626      5726.2438         0.0015 
+    8000      890   0.0029468469  0.00059790118      5726.2438         0.0015 
+    9000      890   0.0016833714  0.00035301332      5726.2438         0.0015 
+   10000      890  0.00065844652  0.00021004905      5726.2438         0.0015 
+   11000      890  0.00030652044  0.00012205976      5726.2438         0.0015 
+   12000      890   0.0001463002  6.1701374e-05      5726.2438         0.0015 
+   13000      890  6.5017192e-05  3.0054165e-05      5726.2438         0.0015 
+   14000      890  2.5254323e-05  1.6434939e-05      5726.2438         0.0015 
+   15000      890  1.4861383e-05  7.6861542e-06      5726.2438         0.0015 
+   16000      890  6.0872577e-06  3.1524261e-06      5726.2438         0.0015 
+   17000      890  2.5683642e-06  1.7401468e-06      5726.2438         0.0015 
+   18000      890  7.5764698e-06  2.6670584e-06      5726.2438         0.0015 
+   19000      890   1.331812e-05   3.336314e-06      5726.2438         0.0015 
+   20000      890  9.1695504e-06  2.1369512e-06      5726.2438         0.0015 
+Loop time of 2805.86 on 4 procs for 19999 steps with 890 atoms, finish time Fri Nov  8 14:55:42 2024
+
+
+Pair  time (%) = 0.82139 (0.0292741)
+Neigh time (%) = 0.0191901 (0.00068393)
+Comm  time (%) = 1688.88 (60.1913)
+Outpt time (%) = 7.58459 (0.270313)
+Other time (%) = 1108.55 (39.5084)
+
+Nlocal:    222.5 ave 447 max 0 min
+Histogram: 2 0 0 0 0 0 0 0 0 2
+Nghost:    55.5 ave 111 max 0 min
+Histogram: 2 0 0 0 0 0 0 0 0 2
+Neighs:    1094.25 ave 2204 max 0 min
+Histogram: 2 0 0 0 0 0 0 0 0 2
+
+Total # of neighbors = 4377
+Ave neighs/atom = 4.91798
+Neighbor list builds = 176
+Dangerous builds = 0
+Setting atom values ...
+  446 settings made for property/atom
+Setting up run at Fri Nov  8 14:55:44 2024
+
+Memory usage per processor = 9.65186 Mbytes
+    Step    Atoms         KinEng            rke       heattran         Volume 
+   20000      890  9.1695504e-06  2.1369512e-06      10508.837         0.0015 
+   21000      890  4.0845958e-06  1.6459457e-06      10508.837         0.0015 
+   22000      890  2.6752319e-06  1.7383629e-06      10508.837         0.0015 
+   23000      890  2.2058192e-07  4.5173266e-07      10508.837         0.0015 
+   24000      890  4.9606316e-08  7.9424181e-08      10508.837         0.0015 
+   25000      890  3.5525348e-08   4.900563e-08      10508.837         0.0015 
+   26000      890   9.072463e-08  9.0485126e-08      10508.837         0.0015 
+   27000      890  1.9587827e-07  1.3242353e-07      10508.837         0.0015 
+   28000      890  5.8619436e-07  3.7645969e-07      10508.837         0.0015 
+   29000      890  1.8089398e-06  8.8257649e-07      10508.837         0.0015 
+   30000      890  1.6094277e-06  1.2390938e-06      10508.837         0.0015 
+   31000      890  1.3058348e-07  2.9409674e-07      10508.837         0.0015 
+   32000      890   1.283054e-07  8.2284371e-08      10508.837         0.0015 
+   33000      890  2.7767375e-07  2.5384207e-07      10508.837         0.0015 
+   34000      890  1.1255335e-08  1.6487664e-08      10508.837         0.0015 
+   35000      890  5.5336618e-09  1.3494997e-08      10508.837         0.0015 
+   36000      890  4.0933023e-09  1.2013157e-08      10508.837         0.0015 
+   37000      890  2.6581932e-09  1.1696673e-08      10508.837         0.0015 
+   38000      890  1.0977957e-09  1.1523188e-08      10508.837         0.0015 
+   39000      890  7.4968215e-10    1.14563e-08      10508.837         0.0015 
+   40000      890  1.0406501e-09  1.1469752e-08      10508.837         0.0015 
+   41000      890  9.3210236e-10  1.1436037e-08      10508.837         0.0015 
+   42000      890  5.5171488e-10  1.1412464e-08      10508.837         0.0015 
+   43000      890  3.9012456e-10  1.1395028e-08      10508.837         0.0015 
+   44000      890  4.5908665e-10  1.1384943e-08      10508.837         0.0015 
+   45000      890   4.453737e-10  1.0711167e-08      10508.837         0.0015 
+   46000      890  3.1821061e-10  1.0261025e-08      10508.837         0.0015 
+   47000      890  2.0492148e-10  1.0257197e-08      10508.837         0.0015 
+   48000      890  1.8513784e-10  1.0256337e-08      10508.837         0.0015 
+   49000      890    2.13403e-10  1.0256216e-08      10508.837         0.0015 
+   50000      890  2.0497001e-10  1.0254475e-08      10508.837         0.0015 
+Loop time of 3369.25 on 4 procs for 30000 steps with 890 atoms, finish time Fri Nov  8 15:51:54 2024
+
+
+Pair  time (%) = 1.46684 (0.0435359)
+Neigh time (%) = 0.000648644 (1.92518e-05)
+Comm  time (%) = 1467.25 (43.5483)
+Outpt time (%) = 11.1551 (0.331084)
+Other time (%) = 1889.38 (56.077)
+
+Nlocal:    222.5 ave 447 max 0 min
+Histogram: 2 0 0 0 0 0 0 0 0 2
+Nghost:    55.5 ave 111 max 0 min
+Histogram: 2 0 0 0 0 0 0 0 0 2
+Neighs:    1094.25 ave 2202 max 0 min
+Histogram: 2 0 0 0 0 0 0 0 0 2
+
+Total # of neighbors = 4377
+Ave neighs/atom = 4.91798
+Neighbor list builds = 5
+Dangerous builds = 0

@@ -67,7 +67,16 @@ namespace Utils {
 
   inline std::string int_to_string(int a)
   {
-    return static_cast< std::ostringstream & >(( std::ostringstream() << std::dec << a ) ).str();
+  
+  #if __cplusplus >= 201103L
+    return std::to_string(a);
+  #else
+    std::ostringstream oss;
+    oss << std::dec << a;
+    return oss.str();
+   #endif
+
+//    return static_cast< std::ostringstream & >(( std::ostringstream() << std::dec << a ) ).str();
   }
 
   inline std::string double_to_string(double dbl)

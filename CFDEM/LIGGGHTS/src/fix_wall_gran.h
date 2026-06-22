@@ -86,6 +86,10 @@ class FixWallGran : public Fix, public LIGGGHTS::IContactHistorySetup {
 
   /* PUBLIC ACCESS FUNCTIONS */
 
+  class FixPropertyAtom *fix_eP;  
+  double eP;
+  bool electricMode_;
+  
   virtual void createMulticontactData();
 
   void setDnum(int newDnum)
@@ -132,6 +136,10 @@ class FixWallGran : public Fix, public LIGGGHTS::IContactHistorySetup {
 
   inline int heattransfer_flag() const
   { return heattransfer_flag_; }
+
+  inline int electrictransfer_flag() const
+  { return electrictransfer_flag_; }
+
 
   inline int stress_flag() const
   { return stress_flag_; }
@@ -210,6 +218,25 @@ class FixWallGran : public Fix, public LIGGGHTS::IContactHistorySetup {
   void wall_temperature_unique(bool &has_temp,bool &temp_unique, double &temperature_unique);
   void addHeatFlux(class TriMesh *mesh,int i,const double ri,double rsq,double area_ratio);
 
+  void wall_electricPotential_unique(bool &has_ep,bool &ep_unique, double &electricPotential_unique);
+  void addElectricFlux(class TriMesh *mesh,int i,const double ri,double rsq,double area_ratio);
+  
+  // in class FixHeatGranElectric:
+  double aspot_fraction_global_;                // default 1.0 (no reduction)
+  FixPropertyGlobal *fix_aspotFrac_;            // optional per-atom-type values
+  const double *aspotFrac_;                           // pointer returned by fix_aspotFrac_
+  double Cmin_branch_;                          // optional tiny cutoff for G (stability)
+
+  const double *sigma0_;       // peratomtype σ at Tref  [S/m]
+  const double *alpha_;        // peratomtype temp coeff [1/K]
+  double        Tref_;         // scalar reference temp  [K]
+  double        sigma_floor_;  // floor, e.g. 1e-12 S/m
+
+  inline double sigma_at_typeT(int, double) const;
+
+  // per-particle temperature
+  FixPropertyAtom *fix_Temp_;  // "Temp" property/atom (if thermal model active)
+
  protected:
 
   int iarg_, narg_;
@@ -239,6 +266,11 @@ class FixWallGran : public Fix, public LIGGGHTS::IContactHistorySetup {
   // heat transfer
   void init_heattransfer();
   bool heattransfer_flag_;
+  
+   // electric transfer
+  void init_electrictransfer();
+  bool electrictransfer_flag_;
+  
   // model for contact area calculation
   int area_calculation_mode_;
 
@@ -275,6 +307,15 @@ class FixWallGran : public Fix, public LIGGGHTS::IContactHistorySetup {
   const double *th_cond;
   double const* const* deltan_ratio;
 
+
+  // electric transfer
+  class FixPropertyAtom *fix_cMatrix;
+  class FixPropertyAtom *fix_pwEP;
+  class FixPropertyAtom *fix_pwER;
+  
+  double ep_wall;
+  const double *e_cond;
+  
   LIGGGHTS::Walls::IGranularWall * impl;
 
   // per-contact force storage

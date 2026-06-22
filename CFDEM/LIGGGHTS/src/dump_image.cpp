@@ -1,50 +1,18 @@
 /* ----------------------------------------------------------------------
-    This is the
+   LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
+   http://lammps.sandia.gov, Sandia National Laboratories
+   Steve Plimpton, sjplimp@sandia.gov
 
-    ██╗     ██╗ ██████╗  ██████╗  ██████╗ ██╗  ██╗████████╗███████╗
-    ██║     ██║██╔════╝ ██╔════╝ ██╔════╝ ██║  ██║╚══██╔══╝██╔════╝
-    ██║     ██║██║  ███╗██║  ███╗██║  ███╗███████║   ██║   ███████╗
-    ██║     ██║██║   ██║██║   ██║██║   ██║██╔══██║   ██║   ╚════██║
-    ███████╗██║╚██████╔╝╚██████╔╝╚██████╔╝██║  ██║   ██║   ███████║
-    ╚══════╝╚═╝ ╚═════╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝®
+   Copyright (2003) Sandia Corporation.  Under the terms of Contract
+   DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains
+   certain rights in this software.  This software is distributed under
+   the GNU General Public License.
 
-    DEM simulation engine, released by
-    DCS Computing Gmbh, Linz, Austria
-    http://www.dcs-computing.com, office@dcs-computing.com
-
-    LIGGGHTS® is part of CFDEM®project:
-    http://www.liggghts.com | http://www.cfdem.com
-
-    Core developer and main author:
-    Christoph Kloss, christoph.kloss@dcs-computing.com
-
-    LIGGGHTS® is open-source, distributed under the terms of the GNU Public
-    License, version 2 or later. It is distributed in the hope that it will
-    be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. You should have
-    received a copy of the GNU General Public License along with LIGGGHTS®.
-    If not, see http://www.gnu.org/licenses . See also top-level README
-    and LICENSE files.
-
-    LIGGGHTS® and CFDEM® are registered trade marks of DCS Computing GmbH,
-    the producer of the LIGGGHTS® software and the CFDEM®coupling software
-    See http://www.cfdem.com/terms-trademark-policy for details.
-
--------------------------------------------------------------------------
-    Contributing author and copyright for this file:
-    This file is from LAMMPS
-    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-    http://lammps.sandia.gov, Sandia National Laboratories
-    Steve Plimpton, sjplimp@sandia.gov
-
-    Copyright (2003) Sandia Corporation.  Under the terms of Contract
-    DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains
-    certain rights in this software.  This software is distributed under
-    the GNU General Public License.
+   See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
-#include <cmath>
-#include "ctype.h"
+#include <math.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include "dump_image.h"
@@ -328,6 +296,9 @@ DumpImage::DumpImage(LAMMPS *lmp, int narg, char **arg) :
       if (strcmp(arg[iarg+1],"yes") == 0) image->ssao = YES;
       else if (strcmp(arg[iarg+1],"no") == 0) image->ssao = NO;
       else error->all(FLERR,"Illegal dump image command");
+      //int seed = force->inumeric(FLERR,arg[iarg+2]);
+      //if (seed <= 0) error->all(FLERR,"Illegal dump image command");
+      //image->seed = seed;
       image->setSeed(arg[iarg+2]);
       double ssaoint = force->numeric(FLERR,arg[iarg+3]);
       if (ssaoint < 0.0 || ssaoint > 1.0)
@@ -422,7 +393,7 @@ void DumpImage::init_style()
 {
   if (multifile == 0 && !multifile_override)
     error->all(FLERR,"Dump image requires one snapshot per file");
-  if (sortBuffer && sortBuffer->sort_set()) error->all(FLERR,"Dump image cannot perform sorting");
+  if (sort_flag) error->all(FLERR,"Dump image cannot perform sorting");
 
   DumpCustom::init_style();
 
@@ -976,14 +947,14 @@ int DumpImage::modify_param(int narg, char **arg)
     int ncount = 1;
     char *nextptr;
     char *ptr = arg[2];
-    while ((nextptr = strchr(ptr,'/'))) { 
+    while ((nextptr = strchr(ptr,'/'))) { //NP modified R.B.
       ptr = nextptr + 1;
       ncount++;
     }
     char **ptrs = new char*[ncount+1];
     ncount = 0;
     ptrs[ncount++] = strtok(arg[2],"/");
-    while ((ptrs[ncount++] = strtok(NULL,"/"))); 
+    while ((ptrs[ncount++] = strtok(NULL,"/"))); //NP modified R.B.
     ncount--;
 
     // assign each of ncount colors in round-robin fashion to types
@@ -1036,14 +1007,14 @@ int DumpImage::modify_param(int narg, char **arg)
     int ncount = 1;
     char *nextptr;
     char *ptr = arg[2];
-    while ((nextptr = strchr(ptr,'/'))) { 
+    while ((nextptr = strchr(ptr,'/'))) { //NP modified R.B.
       ptr = nextptr + 1;
       ncount++;
     }
     char **ptrs = new char*[ncount+1];
     ncount = 0;
     ptrs[ncount++] = strtok(arg[2],"/");
-    while ((ptrs[ncount++] = strtok(NULL,"/"))); 
+    while ((ptrs[ncount++] = strtok(NULL,"/"))); //NP modified R.B.
     ncount--;
 
     // assign each of ncount colors in round-robin fashion to types

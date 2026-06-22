@@ -8,6 +8,6 @@ wmake libso reactionThermo
 wmake libso chemistryModel
 wmake libso gsChemistryModel
 wmake libso SLGThermo
-wmake libso solidThermo
+#wmake libso solidThermo
 
 #------------------------------------------------------------------------------

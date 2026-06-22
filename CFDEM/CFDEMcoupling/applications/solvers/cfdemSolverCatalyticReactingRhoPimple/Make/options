@@ -10,6 +10,7 @@ EXE_INC = \
     -I$(LIB_SRC)/MomentumTransportModels/momentumTransportModels/lnInclude \
     -I$(CATCHY_SRC)/MomentumTransportModels/compressible/lnInclude \
     -I$(LIB_SRC)/MomentumTransportModels/phaseCompressible/lnInclude \
+    -I$(CATCHY_SRC_DIR)/MomentumTransportModels/phaseCompressible/lnInclude \
     -I$(CFDEM_SRC_DIR)/MomentumTransportModels/phaseCompressible/lnInclude \
     -I$(CFDEM_SRC_DIR)/ThermophysicalTransportModels/phaseCompressible/lnInclude \
     -I$(CATCHY_SRC)/thermophysicalModels/specie/lnInclude \

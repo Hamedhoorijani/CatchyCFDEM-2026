@@ -1,52 +1,24 @@
 /* ----------------------------------------------------------------------
-    This is the
+   LIGGGHTS - LAMMPS Improved for General Granular and Granular Heat
+   Transfer Simulations
 
-    ██╗     ██╗ ██████╗  ██████╗  ██████╗ ██╗  ██╗████████╗███████╗
-    ██║     ██║██╔════╝ ██╔════╝ ██╔════╝ ██║  ██║╚══██╔══╝██╔════╝
-    ██║     ██║██║  ███╗██║  ███╗██║  ███╗███████║   ██║   ███████╗
-    ██║     ██║██║   ██║██║   ██║██║   ██║██╔══██║   ██║   ╚════██║
-    ███████╗██║╚██████╔╝╚██████╔╝╚██████╔╝██║  ██║   ██║   ███████║
-    ╚══════╝╚═╝ ╚═════╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝®
+   LIGGGHTS is part of the CFDEMproject
+   www.liggghts.com | www.cfdem.com
 
-    DEM simulation engine, released by
-    DCS Computing Gmbh, Linz, Austria
-    http://www.dcs-computing.com, office@dcs-computing.com
+   This file was modified with respect to the release in LAMMPS
+   Modifications are Copyright 2009-2012 JKU Linz
+                     Copyright 2012-     DCS Computing GmbH, Linz
 
-    LIGGGHTS® is part of CFDEM®project:
-    http://www.liggghts.com | http://www.cfdem.com
+   LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
+   http://lammps.sandia.gov, Sandia National Laboratories
+   Steve Plimpton, sjplimp@sandia.gov
 
-    Core developer and main author:
-    Christoph Kloss, christoph.kloss@dcs-computing.com
+   Copyright (2003) Sandia Corporation.  Under the terms of Contract
+   DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains
+   certain rights in this software.  This software is distributed under
+   the GNU General Public License.
 
-    LIGGGHTS® is open-source, distributed under the terms of the GNU Public
-    License, version 2 or later. It is distributed in the hope that it will
-    be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. You should have
-    received a copy of the GNU General Public License along with LIGGGHTS®.
-    If not, see http://www.gnu.org/licenses . See also top-level README
-    and LICENSE files.
-
-    LIGGGHTS® and CFDEM® are registered trade marks of DCS Computing GmbH,
-    the producer of the LIGGGHTS® software and the CFDEM®coupling software
-    See http://www.cfdem.com/terms-trademark-policy for details.
-
--------------------------------------------------------------------------
-    Contributing author and copyright for this file:
-    This file is from LAMMPS, but has been modified. Copyright for
-    modification:
-
-    Copyright 2012-     DCS Computing GmbH, Linz
-    Copyright 2009-2012 JKU Linz
-
-    Copyright of original file:
-    LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
-    http://lammps.sandia.gov, Sandia National Laboratories
-    Steve Plimpton, sjplimp@sandia.gov
-
-    Copyright (2003) Sandia Corporation.  Under the terms of Contract
-    DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains
-    certain rights in this software.  This software is distributed under
-    the GNU General Public License.
+   See the README file in the top-level directory.
 ------------------------------------------------------------------------- */
 
 #ifdef DUMP_CLASS
@@ -69,7 +41,7 @@ class DumpCustom : public Dump {
 
  protected:
   int nevery;                // dump frequency for output
-  char *label;               // string for dump file header 
+  char *label;               // string for dump file header //NP modified C.K.
   int iregion;               // -1 if no region, else which region
   char *idregion;            // region ID
   int nthresh;               // # of defined threshholds
@@ -108,6 +80,10 @@ class DumpCustom : public Dump {
   int *variable;             // list of indices for the Variables
   double **vbuf;             // local storage for variable evaluation
 
+  int ncustom;               // # of custom atom properties
+  char **id_custom;          // their names
+  int *flag_custom;          // their data type
+
   int ntypes;                // # of atom types
   char **typenames;             // array of element names for each type
 
@@ -125,6 +101,7 @@ class DumpCustom : public Dump {
   int add_compute(char *);
   int add_fix(char *);
   int add_variable(char *);
+  int add_custom(char *, int);
   virtual int modify_param(int, char **);
 
   typedef void (DumpCustom::*FnPtrHeader)(bigint);
@@ -153,6 +130,7 @@ class DumpCustom : public Dump {
   void pack_compute(int);
   void pack_fix(int);
   void pack_variable(int);
+  void pack_custom(int);
 
   void pack_id(int);
   void pack_molecule(int);
@@ -191,9 +169,9 @@ class DumpCustom : public Dump {
   void pack_fy(int);
   void pack_fz(int);
   void pack_q(int);
-  void pack_density(int); 
-  void pack_p(int);       
-  void pack_rho(int);     
+  void pack_density(int); //NP modified C.K.
+  void pack_p(int);       //NP modified A.A.
+  void pack_rho(int);     //NP modified A.A.
   void pack_mux(int);
   void pack_muy(int);
   void pack_muz(int);
@@ -214,6 +192,8 @@ class DumpCustom : public Dump {
   void pack_eradius(int);
   void pack_ervel(int);
   void pack_erforce(int);
+
+// superquadric start
   void pack_shapex(int); 
   void pack_shapey(int);
   void pack_shapez(int);
@@ -226,6 +206,9 @@ class DumpCustom : public Dump {
   void pack_inertiax(int);
   void pack_inertiay(int);
   void pack_inertiaz(int);
+// superquadric end
+
+  void pack_thread(int); //NP modified R.B.
 };
 
 }

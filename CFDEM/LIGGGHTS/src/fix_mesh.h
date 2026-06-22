@@ -136,8 +136,13 @@ namespace LAMMPS_NS
         double temperature_mesh_;
         double mass_temperature_;
 
+        double electricPotential_mesh_;
+        
+        bool electricMode_;
+        
         bool trackPerElementTemp_;
-
+        bool trackPerElementEp_;
+        
       private:
 
         void handle_exclusion_list();

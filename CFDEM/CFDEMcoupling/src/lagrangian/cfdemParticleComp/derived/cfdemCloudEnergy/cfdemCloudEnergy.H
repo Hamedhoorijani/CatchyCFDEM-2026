@@ -45,7 +45,7 @@ class energyModel;
 class massTransferModel;
 class thermCondModel;
 class catalyticChemistryModel;
-
+class eModel;
 /*---------------------------------------------------------------------------*\
                            Class cfdemCloudEnergy Declaration
 \*---------------------------------------------------------------------------*/
@@ -64,6 +64,8 @@ protected:
 
     const wordList catalyticChemistryModels_;
 
+    const wordList eModels_; //Added
+
     PtrList<energyModel> energyModel_;
 
     PtrList<massTransferModel> massTransferModel_;
@@ -72,11 +74,15 @@ protected:
 
     PtrList<catalyticChemistryModel> catalyticChemistryModel_;
 
+    PtrList<eModel> eModel_; //added
+    
     void calcEnergyContributions();
 
     void calcMassTransferContributions();
 
     void speciesExecute();
+
+    void electrificationExecute(); //added
 
 public:
 
@@ -86,6 +92,7 @@ public:
 
     friend class catalyticChemistryModel;
 
+    friend class eModel; //added
     // Constructors
 
         //- Construct from components
@@ -113,7 +120,9 @@ public:
        const thermCondModel& thermCondM();
 
        const catalyticChemistryModel& catalyticChemistryM(int);
-
+       
+       const eModel& eM(int); //added
+       
        label nrEnergyModels() const;
 
        label nrMassTransferModels() const;
@@ -122,12 +131,16 @@ public:
 
        int nrCatalyticChemistryModels();
 
+       int nrEModels(); //added
+
        inline const wordList& energyModels() const;
 
        inline const wordList& massTransferModels() const;
 
        inline const wordList& catalyticChemistryModels() const;
 
+       inline const wordList& eModels() const; //added
+       
        void energyContributions(volScalarField&);
 
        void energyCoefficients(volScalarField&);

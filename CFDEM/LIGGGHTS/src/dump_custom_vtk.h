@@ -1,51 +1,31 @@
 /* ----------------------------------------------------------------------
-    This is the
+   LIGGGHTS - LAMMPS Improved for General Granular and Granular Heat
+   Transfer Simulations
 
-    ██╗     ██╗ ██████╗  ██████╗  ██████╗ ██╗  ██╗████████╗███████╗
-    ██║     ██║██╔════╝ ██╔════╝ ██╔════╝ ██║  ██║╚══██╔══╝██╔════╝
-    ██║     ██║██║  ███╗██║  ███╗██║  ███╗███████║   ██║   ███████╗
-    ██║     ██║██║   ██║██║   ██║██║   ██║██╔══██║   ██║   ╚════██║
-    ███████╗██║╚██████╔╝╚██████╔╝╚██████╔╝██║  ██║   ██║   ███████║
-    ╚══════╝╚═╝ ╚═════╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝®
+   LIGGGHTS is part of the CFDEMproject
+   www.liggghts.com | www.cfdem.com
 
-    DEM simulation engine, released by
-    DCS Computing Gmbh, Linz, Austria
-    http://www.dcs-computing.com, office@dcs-computing.com
+   Christoph Kloss, christoph.kloss@cfdem.com
+   Copyright 2009-2012 JKU Linz
+   Copyright 2012-     DCS Computing GmbH, Linz
 
-    LIGGGHTS® is part of CFDEM®project:
-    http://www.liggghts.com | http://www.cfdem.com
+   LIGGGHTS is based on LAMMPS
+   LAMMPS - Large-scale Atomic/Molecular Massively Parallel Simulator
+   http://lammps.sandia.gov, Sandia National Laboratories
+   Steve Plimpton, sjplimp@sandia.gov
 
-    Core developer and main author:
-    Christoph Kloss, christoph.kloss@dcs-computing.com
+   This software is distributed under the GNU General Public License.
 
-    LIGGGHTS® is open-source, distributed under the terms of the GNU Public
-    License, version 2 or later. It is distributed in the hope that it will
-    be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. You should have
-    received a copy of the GNU General Public License along with LIGGGHTS®.
-    If not, see http://www.gnu.org/licenses . See also top-level README
-    and LICENSE files.
-
-    LIGGGHTS® and CFDEM® are registered trade marks of DCS Computing GmbH,
-    the producer of the LIGGGHTS® software and the CFDEM®coupling software
-    See http://www.cfdem.com/terms-trademark-policy for details.
-
--------------------------------------------------------------------------
-    Contributing author and copyright for this file:
-    (if no contributing author is listed, this file has been contributed
-    by the core developer)
-
-    Copyright 2014-     DCS Computing GmbH, Linz
+   See the README file in the top-level directory.
 ------------------------------------------------------------------------- */
 
 /* ----------------------------------------------------------------------
-   Contributing authors:
+   Contributing author:
    Daniel Queteschiner, daniel.queteschiner@dcs-computing.com
-   Alexander Podlozhnyuk, alexander.podlozhnyuk@dcs-computing.com
+   Richard Berger, richard.berger@jku.at
 ------------------------------------------------------------------------- */
 
-#if defined(LAMMPS_VTK) 
-
+#if defined(LAMMPS_VTK) //NP do not use #ifdef here (VS C++ bug)
 #ifdef DUMP_CLASS
 
 DumpStyle(custom/vtk,DumpCustomVTK)
@@ -56,14 +36,13 @@ DumpStyle(custom/vtk,DumpCustomVTK)
 #define LMP_DUMP_CUSTOM_VTK_H
 
 #include "dump.h"
-#include "dump_vtk.h"
-#include "dump_particle.h"
 #include <map>
 #include <set>
 #include <string>
 
 #include <vtkSmartPointer.h>
-#include <vtkMultiBlockDataSet.h>
+#include <vtkPoints.h>
+#include <vtkCellArray.h>
 
 class vtkAbstractArray;
 class vtkRectilinearGrid;
@@ -86,20 +65,29 @@ namespace LAMMPS_NS {
  * This dump command does not support compressed files, buffering or custom format strings,
  * multiproc is only supported by the xml formats, multifile option has to be used.
  */
-class DumpCustomVTK : public Dump, public DumpVTK
-{
+class DumpCustomVTK : public Dump {
  public:
   DumpCustomVTK(class LAMMPS *, int, char **);
   virtual ~DumpCustomVTK();
 
   virtual void write();
  protected:
-  char *label;               // string for dump file header 
-  DumpParticle *dumpParticle;
-  vtkSmartPointer<vtkMultiBlockDataSet> mbSet;
-
   int nevery;                // dump frequency for output
+  char *label;               // string for dump file header //NP modified C.K.
+  int iregion;               // -1 if no region, else which region
+  char *idregion;            // region ID
+  int nthresh;               // # of defined thresholds
+  int *thresh_array;         // array to threshold on for each nthresh
+  int *thresh_op;            // threshold operation for each nthresh
+  double *thresh_value;      // threshold value for each nthresh
+
   int vtk_file_format;       // which vtk file format to write (vtk, vtp, vtu ...)
+
+  int nchoose;               // # of selected atoms
+  int maxlocal;              // size of atom selection and variable arrays
+  int *choose;               // local indices of selected atoms
+  double *dchoose;           // value for each atom to threshhold against
+  int *clist;                // compressed list of indices of selected atoms
 
   int nfield;                // # of keywords listed by user
   int ioptional;             // index of start of optional args
@@ -108,15 +96,41 @@ class DumpCustomVTK : public Dump, public DumpVTK
   std::map<int, int> argindex;    // index into compute,fix scalar_atom,vector_atom
                                   // 0 for scalar_atom, 1-N for vector_atom values
 
+  int ncompute;              // # of Compute objects used by dump
+  char **id_compute;         // their IDs
+  class Compute **compute;   // list of ptrs to the Compute objects
+
+  int nfix;                  // # of Fix objects used by dump
+  char **id_fix;             // their IDs
+  class Fix **fix;           // list of ptrs to the Fix objects
+
+  int nvariable;             // # of Variables used by dump
+  char **id_variable;        // their names
+  int *variable;             // list of indices for the Variables
+  double **vbuf;             // local storage for variable evaluation
+
+  int ncustom;               // # of custom atom properties
+  char **id_custom;          // their names
+  int *flag_custom;          // their data type
+
+  int ntypes;                // # of atom types
+  char **typenames;          // array of element names for each type
+
   // private methods
 
   virtual void init_style();
   virtual void write_header(bigint);
   int count();
+  void pack(int *);
   virtual void write_data(int, double *);
   bigint memory_usage();
-  void pack(int *) {}
 
+  int parse_fields(int, char **);
+  void identify_vectors();
+  int add_compute(char *);
+  int add_fix(char *);
+  int add_variable(char *);
+  int add_custom(char *, int);
   virtual int modify_param(int, char **);
 
   typedef void (DumpCustomVTK::*FnPtrHeader)(bigint);
@@ -129,17 +143,119 @@ class DumpCustomVTK : public Dump, public DumpVTK
   void write_vtp(int, double *);
   void write_vtu(int, double *);
 
+  void prepare_domain_data(vtkRectilinearGrid *);
+  void prepare_domain_data_triclinic(vtkUnstructuredGrid *);
   void write_domain_vtk();
   void write_domain_vtk_triclinic();
   void write_domain_vtr();
   void write_domain_vtu_triclinic();
 
-                                                                // is then added to the point cells upon writing
+  typedef void (DumpCustomVTK::*FnPtrPack)(int);
+  std::map<int, FnPtrPack> pack_choice;  // ptrs to pack functions
+  std::map<int, int> vtype;              // data type
+  std::map<int, std::string> name;       // attribute labels
+  std::set<int> vector_set;              // set of vector attributes
+  int current_pack_choice_key;
 
+  // vtk data containers
+  vtkSmartPointer<vtkPoints> points;
+  vtkSmartPointer<vtkCellArray> pointsCells;
+  std::map<int, vtkSmartPointer<vtkAbstractArray> > myarrays;
+
+  int n_calls_;
+  double (*boxcorners)[3]; // corners of triclinic domain box
   char *filecurrent;
   char *domainfilecurrent;
+  char *parallelfilecurrent;
+  char *multiname_ex;
 
   void setFileCurrent();
+  void buf2arrays(int, double *); // transfer data from buf array to vtk arrays
+  void reset_vtk_data_containers();
+
+  // customize by adding a method prototype
+  void pack_compute(int);
+  void pack_fix(int);
+  void pack_variable(int);
+  void pack_custom(int);
+
+  void pack_id(int);
+  void pack_molecule(int);
+  void pack_type(int);
+  void pack_mass(int);
+
+  void pack_x(int);
+  void pack_y(int);
+  void pack_z(int);
+  void pack_xs(int);
+  void pack_ys(int);
+  void pack_zs(int);
+  void pack_xs_triclinic(int);
+  void pack_ys_triclinic(int);
+  void pack_zs_triclinic(int);
+  void pack_xu(int);
+  void pack_yu(int);
+  void pack_zu(int);
+  void pack_xu_triclinic(int);
+  void pack_yu_triclinic(int);
+  void pack_zu_triclinic(int);
+  void pack_xsu(int);
+  void pack_ysu(int);
+  void pack_zsu(int);
+  void pack_xsu_triclinic(int);
+  void pack_ysu_triclinic(int);
+  void pack_zsu_triclinic(int);
+  void pack_ix(int);
+  void pack_iy(int);
+  void pack_iz(int);
+
+  void pack_vx(int);
+  void pack_vy(int);
+  void pack_vz(int);
+  void pack_fx(int);
+  void pack_fy(int);
+  void pack_fz(int);
+  void pack_q(int);
+  void pack_density(int); //NP modified C.K.
+  void pack_p(int);       //NP modified A.A.
+  void pack_rho(int);     //NP modified A.A.
+  void pack_mux(int);
+  void pack_muy(int);
+  void pack_muz(int);
+  void pack_mu(int);
+  void pack_radius(int);
+  void pack_diameter(int);
+
+  void pack_omegax(int);
+  void pack_omegay(int);
+  void pack_omegaz(int);
+  void pack_angmomx(int);
+  void pack_angmomy(int);
+  void pack_angmomz(int);
+  void pack_tqx(int);
+  void pack_tqy(int);
+  void pack_tqz(int);
+  void pack_spin(int);
+  void pack_eradius(int);
+  void pack_ervel(int);
+  void pack_erforce(int);
+
+// superquadric start
+  void pack_shapex(int); 
+  void pack_shapey(int);
+  void pack_shapez(int);
+  void pack_quat1(int);
+  void pack_quat2(int);
+  void pack_quat3(int);
+  void pack_quat4(int);
+  void pack_blockiness1(int);
+  void pack_blockiness2(int);
+  void pack_inertiax(int);
+  void pack_inertiay(int);
+  void pack_inertiaz(int);
+// superquadric end
+
+  //void pack_thread(int); //NP modified R.B.
 };
 
 }
