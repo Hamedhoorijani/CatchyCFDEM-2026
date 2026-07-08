@@ -61,6 +61,11 @@ To clean the installation, run
 Get the catchyCFDEM source code from Github
 
     git clone https://github.com/FlorianWery/catchyCFDEM.git
+
+and for the new version 
+
+    git clone https://github.com/Hamedhoorijani/CatchyCFDEM-2026.git
+
 By default, it is assumed that the catchyCFDEM repository is located in $HOME/OpenFOAM. If this is not the case, adjust catchyCFDEM/etc/bashrc accordingly. Also, if Cantera is installed in a non-default location, it can be set in catchyCFDEM/etc/bashrc.
 
 To use catchyCFDEM, the catchyCFDEM environment should be set by sourcing the catchyCFDEM/etc/bashrc and catchyCFDEM/CFDEM/CFDEMcoupling/etc/bashrc files. This can be done by adding the following line at the end of the user's .bashrc file (to be adjusted accordingly if catchyCFDEM is not located in $HOME/OpenFOAM)
