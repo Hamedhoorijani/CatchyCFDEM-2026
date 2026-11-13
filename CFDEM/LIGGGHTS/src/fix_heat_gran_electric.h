@@ -47,7 +47,6 @@ public:
   void updatePtrs();
 
   void end_of_step();  // new
-  // Electric core (kept intact in your .cpp)
   template<int HISTFLAG,int CONTACTAREA>
   double conductanceLocalIJ(int i, int j);
 
@@ -98,7 +97,6 @@ private:
   
   inline double aspot_fraction_for_types(int, int) const;
 
-  // -------- order matches constructor init-list in your .cpp ------------
   // global/per-type thermal
   FixPropertyGlobal *fix_eConductivity_ = nullptr;
   double *eConductivity_ = nullptr;
@@ -161,9 +159,9 @@ private:
   double cutGhostsq  = 0.01;
   bool   radiation_flag_ = false;
 
-  // 🔧 MISSING BEFORE → used in init(), calculateRadiation(), reflect()
-  FixPropertyGlobal *fix_emissivity_ = nullptr; // (optional handle)
-  const double *emissivity_ = nullptr;          // per-type emissivity
+ 
+  FixPropertyGlobal *fix_emissivity_ = nullptr;
+  const double *emissivity_ = nullptr;          
 
   // component labeling helpers
   int *compID = nullptr;
