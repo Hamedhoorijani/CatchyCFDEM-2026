@@ -158,20 +158,19 @@ FixWallGran::FixWallGran(LAMMPS *lmp, int narg, char **arg) :
 
     area_calculation_mode_ = CONDUCTION_CONTACT_AREA_OVERLAP;
 
-	electricMode_ = false;
+    electricMode_ = false;
     ep_wall = -1;
-    
+
     aspot_fraction_global_ = 1.0;
     fix_aspotFrac_ = NULL;
     aspotFrac_ = NULL;
-    
+
     sigma0_ = NULL;
     alpha_ = NULL;
-    Tref_ = 293.15;        // 20°C default
-    sigma_floor_ = 1e-12;  // safe tiny floor
-  
-	// per-particle temperature
-	FixPropertyAtom *fix_Temp_ = NULL;  // "Temp" property/atom (if thermal model active)
+    Tref_ = 293.15;
+    sigma_floor_ = 1e-12;
+
+    fix_Temp_ = NULL;
 
     // parse args
     //style = new char[strlen(arg[2])+2];
@@ -219,21 +218,21 @@ FixWallGran::FixWallGran(LAMMPS *lmp, int narg, char **arg) :
 
            char *wallstyle = arg[iarg_++];
            int nPrimitiveArgs = PRIMITIVE_WALL_DEFINITIONS::numArgsPrimitiveWall(wallstyle);
-           
+
            if(narg-iarg_ < nPrimitiveArgs)
             error->fix_error(FLERR,this,"not enough arguments for primitive wall");
 
            double * argVec = new double[nPrimitiveArgs];
            for(int i=0;i<nPrimitiveArgs;i++)
            {
-             
+
              argVec[i] = force->numeric(FLERR,arg[iarg_++]);
            }
 
            bool setflag = false;
            for(int w=0;w<(int)PRIMITIVE_WALL_DEFINITIONS::NUM_WTYPE;w++)
            {
-             
+
              if(strcmp(wallstyle,PRIMITIVE_WALL_DEFINITIONS::wallString[w]) == 0)
              {
                primitiveWall_ = new PrimitiveWall(lmp,(PRIMITIVE_WALL_DEFINITIONS::WallType)w,nPrimitiveArgs,argVec);
@@ -323,7 +322,7 @@ FixWallGran::FixWallGran(LAMMPS *lmp, int narg, char **arg) :
 
               if(FixMesh_list_[i-1]->trackStress())
                 stress_flag_ = true;
-              
+
           }
           hasargs = true;
           iarg_ += 1+n_FixMesh_;
@@ -356,7 +355,7 @@ FixWallGran::FixWallGran(LAMMPS *lmp, int narg, char **arg) :
             hasargs = true;
             iarg_ += 2;
         } else if (strcmp(arg[iarg_],"electricPotential") == 0) {
-			electricMode_=true;
+            electricMode_ = true;
             if (iarg_+1 >= narg)
               error->fix_error(FLERR,this,"not enough arguments for 'electricPotential'");
             ep_wall = force->numeric(FLERR,arg[iarg_+1]);
@@ -504,15 +503,13 @@ void FixWallGran::post_create()
         modify->add_fix(25,const_cast<char**>(fixarg));
         fix_wallforce_contact_stress_ = static_cast<FixContactPropertyAtomWall*>(modify->find_fix_id(fixid));
    }
-   
-   
-   //declaration of electric transfer fixes
+
    fix_cMatrix = static_cast<FixPropertyAtom*>(modify->find_fix_property("cMatrix", "property/atom", "scalar",0,0,this->style,false));
    if(!fix_cMatrix)
    {
-	   const char* fixarg[11];
-	   fixarg[0]="cMatrix";
-	   fixarg[1]="all";
+       const char* fixarg[11];
+       fixarg[0]="cMatrix";
+       fixarg[1]="all";
        fixarg[2]="property/atom";
        fixarg[3]="cMatrix";
        fixarg[4]="scalar";
@@ -522,14 +519,13 @@ void FixWallGran::post_create()
        fixarg[8]="0";
        fix_cMatrix = modify->add_fix_property_atom(9,const_cast<char**>(fixarg),style);
    }
-   
-   //declaration of electric transfer fixes
+
    fix_pwEP = static_cast<FixPropertyAtom*>(modify->find_fix_property("pwEP", "property/atom", "scalar",0,0,this->style,false));
    if(!fix_pwEP)
    {
-	   const char* fixarg[11];
-	   fixarg[0]="pwEP";
-	   fixarg[1]="all";
+       const char* fixarg[11];
+       fixarg[0]="pwEP";
+       fixarg[1]="all";
        fixarg[2]="property/atom";
        fixarg[3]="pwEP";
        fixarg[4]="scalar";
@@ -539,13 +535,13 @@ void FixWallGran::post_create()
        fixarg[8]="0";
        fix_pwEP = modify->add_fix_property_atom(9,const_cast<char**>(fixarg),style);
    }
-   
+
    fix_pwER = static_cast<FixPropertyAtom*>(modify->find_fix_property("pwER", "property/atom", "scalar",0,0,this->style,false));
    if(!fix_pwER)
    {
-	   const char* fixarg[11];
-	   fixarg[0]="pwER";
-	   fixarg[1]="all";
+       const char* fixarg[11];
+       fixarg[0]="pwER";
+       fixarg[1]="all";
        fixarg[2]="property/atom";
        fixarg[3]="pwER";
        fixarg[4]="scalar";
@@ -555,12 +551,12 @@ void FixWallGran::post_create()
        fixarg[8]="0";
        fix_pwER = modify->add_fix_property_atom(9,const_cast<char**>(fixarg),style);
    }
-   
+
    // create neighbor list for each mesh
-   
+
    for(int i=0;i<n_FixMesh_;i++)
    {
-       
+
        FixMesh_list_[i]->createWallNeighList(igroup);
        FixMesh_list_[i]->createContactHistory(dnum());
 
@@ -622,7 +618,7 @@ void FixWallGran::pre_delete(bool unfixflag)
     {
        for(int i=0;i<n_FixMesh_;i++)
        {
-           
+
            FixMesh_list_[i]->deleteWallNeighList();
            FixMesh_list_[i]->deleteContactHistory();
 
@@ -699,7 +695,7 @@ void FixWallGran::init()
         }
 
         // disallow more than one wall of non-primitive style
-        
+
         if(is_mesh_wall())
         {
             int nfix = modify->n_fixes_style("wall/gran");
@@ -712,55 +708,41 @@ void FixWallGran::init()
             }
         }
     }
-    
+
     fix_sum_normal_force_ =
         static_cast<FixPropertyAtom*>
         (
             modify->find_fix_property("sum_normal_force_","property/atom","scalar",0,0,style, false)
         );
-        
-        
-	int max_type = atom->get_properties()->max_type();
 
-	// legacy/fallback conductivity
-	if (auto *fx = static_cast<FixPropertyGlobal*>(
-		  modify->find_fix_property("electricalConductivity","property/global","peratomtype",max_type,0,style,false)))
-	  e_cond = fx->get_values();
+    int max_type = atom->get_properties()->max_type();
+    FixPropertyGlobal *fpg = NULL;
 
-	// temperature law parameters (optional)
-	if (auto *fx = static_cast<FixPropertyGlobal*>(
-		  modify->find_fix_property("electricalSigma0","property/global","peratomtype",max_type,0,style,false)))
-	  sigma0_ = fx->get_values();
+    fpg = static_cast<FixPropertyGlobal*>(modify->find_fix_property("electricalConductivity","property/global","peratomtype",max_type,0,style,false));
+    if(fpg) e_cond = fpg->get_values();
 
-	if (auto *fx = static_cast<FixPropertyGlobal*>(
-		  modify->find_fix_property("electricalAlpha","property/global","peratomtype",max_type,0,style,false)))
-	  alpha_ = fx->get_values();
+    fpg = static_cast<FixPropertyGlobal*>(modify->find_fix_property("electricalSigma0","property/global","peratomtype",max_type,0,style,false));
+    if(fpg) sigma0_ = fpg->get_values();
 
-	if (auto *fx = static_cast<FixPropertyGlobal*>(
-		  modify->find_fix_property("electricalTref","property/global","scalar",0,0,style,false)))
-	  Tref_ = fx->compute_scalar();
+    fpg = static_cast<FixPropertyGlobal*>(modify->find_fix_property("electricalAlpha","property/global","peratomtype",max_type,0,style,false));
+    if(fpg) alpha_ = fpg->get_values();
 
-	if (auto *fx = static_cast<FixPropertyGlobal*>(
-		  modify->find_fix_property("electricalSigmaFloor","property/global","scalar",0,0,style,false)))
-	  sigma_floor_ = std::max(0.0, fx->compute_scalar());
+    fpg = static_cast<FixPropertyGlobal*>(modify->find_fix_property("electricalTref","property/global","scalar",0,0,style,false));
+    if(fpg) Tref_ = fpg->compute_scalar();
 
-	// a-spot fraction (optional peratomtype or scalar)
-	if (auto *fx = static_cast<FixPropertyGlobal*>(
-		  modify->find_fix_property("electricalAspotFraction","property/global","peratomtype",max_type,0,style,false)))
-	  aspotFrac_ = fx->get_values();
-	else if (auto *fxs = static_cast<FixPropertyGlobal*>(
-		  modify->find_fix_property("electricalAspotFraction","property/global","scalar",0,0,style,false)))
-	  aspot_fraction_global_ = fxs->compute_scalar();
+    fpg = static_cast<FixPropertyGlobal*>(modify->find_fix_property("electricalSigmaFloor","property/global","scalar",0,0,style,false));
+    if(fpg) sigma_floor_ = std::max(0.0, fpg->compute_scalar());
 
-	// per-atom temperature (if thermal model in use)
-	fix_Temp_ = static_cast<FixPropertyAtom*>(
-	  modify->find_fix_property("Temp","property/atom","scalar",1,0,style,false));
+    fpg = static_cast<FixPropertyGlobal*>(modify->find_fix_property("electricalAspotFraction","property/global","peratomtype",max_type,0,style,false));
+    if(fpg)
+        aspotFrac_ = fpg->get_values();
+    else
+    {
+        fpg = static_cast<FixPropertyGlobal*>(modify->find_fix_property("electricalAspotFraction","property/global","scalar",0,0,style,false));
+        if(fpg) aspot_fraction_global_ = fpg->compute_scalar();
+    }
 
-	// optional overlap correction table if you use it with walls
-	// deltan_ratio_ = ... (same way you computed it for particles)
-        
-        
-        
+    fix_Temp_ = static_cast<FixPropertyAtom*>(modify->find_fix_property("Temp","property/atom","scalar",1,0,style,false));
 }
 
 void FixWallGran::createMulticontactData()
@@ -842,7 +824,7 @@ void FixWallGran::pre_force(int vflag)
 #endif
 
     // build neighlist for primitive walls
-    
+
     if(rebuildPrimitiveNeighlist_)
       primitiveWall_->buildNeighList(radius_ ? neighbor->skin:(r0_+neighbor->skin),x_,radius_,nlocal);
 
@@ -881,7 +863,7 @@ void FixWallGran::post_force_pgl()
     // call finalize for cwl
     if(cwl_)
     {
-        
+
         cwl_->pair_finalize();
     }
 }
@@ -965,7 +947,7 @@ void FixWallGran::post_force_respa(int vflag, int ilevel, int iloop)
 
 void FixWallGran::post_force_mesh(int vflag)
 {
-    
+
     // contact properties
     double v_wall[3],bary[3];
     double delta[3],deltan;
@@ -979,15 +961,10 @@ void FixWallGran::post_force_mesh(int vflag)
     SurfacesIntersectData sidata;
     sidata.is_wall = true;
 
-	
-	 // Place holder for the model consistency with previous versions
-	
-	fix_cMatrix->set_all(0.);
-	fix_pwEP->set_all(0.);
-	fix_pwER->set_all(0.);
-	
-	
-	
+    if(fix_cMatrix) fix_cMatrix->set_all(0.);
+    if(fix_pwEP)    fix_pwEP->set_all(0.);
+    if(fix_pwER)    fix_pwER->set_all(0.);
+
     for(int iMesh = 0; iMesh < n_FixMesh_; iMesh++)
     {
       TriMesh *mesh = FixMesh_list_[iMesh]->triMesh();
@@ -995,7 +972,7 @@ void FixWallGran::post_force_mesh(int vflag)
       FixContactHistoryMesh *fix_contact = FixMesh_list_[iMesh]->contactHistory();
 
       // mark all contacts for delettion at this point
-      
+
       if(fix_contact) fix_contact->markAllContacts();
 
       if(store_force_contact_)
@@ -1014,12 +991,6 @@ void FixWallGran::post_force_mesh(int vflag)
       vMeshC = mesh->prop().getElementProperty<MultiVectorContainer<double,3,3> >("v");
       if(vMeshC)
         vMesh = vMeshC->begin();
-        
-	  // place holder for later
-	  /*double ep_mesh;
-	  ScalarContainer<double> *ep_ptr = mesh->prop().getGlobalProperty<ScalarContainer<double>>("electricPotential");
-	  if(ep_ptr)	ep_mesh = (*ep_ptr)(0);*/
-	 
 
       atom_type_wall_ = FixMesh_list_[iMesh]->atomTypeWall();
 
@@ -1030,7 +1001,7 @@ void FixWallGran::post_force_mesh(int vflag)
           const int numneigh = neighborList.size();
           for(int iCont = 0; iCont < numneigh; iCont++)
           {
-            
+
             const int iPart = neighborList[iCont];
 
             // do not handle ghost particles
@@ -1084,10 +1055,10 @@ void FixWallGran::post_force_mesh(int vflag)
                     if (contact)
                         sidata.radi += deltaData[3];
                 }
-                
+
                 deltan = mesh->resolveTriSphereContactBary(iPart, iTri, sidata.radi, x_[iPart], delta, bary, barysign, atom->shapetype_flag ? false : true);
             #endif
-            
+
             if(deltan > cutneighmax_) continue;
 
             sidata.i = iPart;
@@ -1098,7 +1069,7 @@ void FixWallGran::post_force_mesh(int vflag)
 
             if(atom->shapetype_flag)
             {
-                
+
                 sidata.j = iTri;
                 fix_contact->handleContact(iPart,idTri,sidata.contact_history,intersectflag,false);
                 if(vMeshC)
@@ -1115,19 +1086,14 @@ void FixWallGran::post_force_mesh(int vflag)
                 sidata.computeflag = computeflag_;
                 intersectflag = impl->checkSurfaceIntersect(sidata);
                 deltan = -sidata.deltan;
-                
+
             }
 
             sidata.fix_mesh = FixMesh_list_[iMesh];
 
             if(deltan <= 0 || (radius && deltan < contactDistanceMultiplier*radius[iPart]))
             {
-              
-              /*
-              double delta_n_used = (deltan <=0 ) ? (-deltan) : 0.0;
-              if(ep_mesh) addElectricFlux(ep_mesh, iPart, radius[iPart], delta_n_used, 1.0);
-              */
-                            
+
               if(!atom->shapetype_flag && fix_contact && ! fix_contact->handleContact(iPart,idTri,sidata.contact_history,intersectflag,7 == barysign)) continue;
 
               if(vMeshC && !atom->shapetype_flag)
@@ -1153,7 +1119,7 @@ void FixWallGran::post_force_mesh(int vflag)
       }
 
       // clean-up contacts
-      
+
       if(fix_contact) fix_contact->cleanUpContacts();
     }
 }
@@ -1170,7 +1136,7 @@ void FixWallGran::post_force_primitive(int vflag)
   sidata.is_wall = true;
   double *radius = atom->radius;
   const double contactDistanceMultiplier = neighbor->contactDistanceFactor - 1.0;
-  
+
   // contact properties
   double delta[3]={},deltan,rdist[3];
   double v_wall[] = {0.,0.,0.};
@@ -1255,7 +1221,7 @@ void FixWallGran::post_force_primitive(int vflag)
       {
           primitiveWall_->calcRadialDistance(x_[iPart],rdist);
           vectorCross3D(shearAxisVec_,rdist,v_wall);
-          
+
       }
       sidata.i = iPart;
       sidata.contact_history = c_history ? c_history[iPart] : NULL;
@@ -1282,7 +1248,7 @@ void FixWallGran::post_force_primitive(int vflag)
         compute_force(sidata, v_wall); // LEGACY CODE (SPH)
       }
     }
-    
+
     else
     {
       if(c_history)
@@ -1297,7 +1263,7 @@ void FixWallGran::post_force_primitive(int vflag)
 
 void FixWallGran::compute_force(SurfacesIntersectData &, double *)
 {
-    
+
 }
 
 /* ---------------------------------------------------------------------- */
@@ -1319,7 +1285,7 @@ int FixWallGran::is_moving()
 
 int FixWallGran::n_contacts_local(int &nIntersect)
 {
-    
+
     if (!is_mesh_wall()) return 0;
 
     int ncontacts = 0;
@@ -1345,7 +1311,7 @@ int FixWallGran::n_contacts_all(int &nIntersect)
 
 int FixWallGran::n_contacts_local(int contact_groupbit, int &nIntersect)
 {
-    
+
     if (!is_mesh_wall()) return 0;
 
     int ncontacts = 0;
@@ -1431,20 +1397,17 @@ void FixWallGran::init_heattransfer()
 
     // get deltan_ratio set by the heat transfer fix
     if(ymo_fix && n_htf) deltan_ratio = static_cast<FixPropertyGlobal*>(ymo_fix)->get_array_modified();
-    
+
 }
 
-
+/* ---------------------------------------------------------------------- */
 
 void FixWallGran::init_electrictransfer()
 {
     fix_pwEP = NULL;
     fix_pwER = NULL;
-	fix_eP = NULL;
+    fix_eP = NULL;
     fix_cMatrix = NULL;
-    deltan_ratio = NULL;
-
-    // decide if heat transfer is to be calculated
 
     if (!is_mesh_wall() && ep_wall < 0) return;
     else if (is_mesh_wall())
@@ -1458,26 +1421,20 @@ void FixWallGran::init_electrictransfer()
         if(!electricflag) return;
     }
 
-    // heat transfer is to be calculated - continue with initializations
-
-    // set flag so addelectricFlux function is called
     electrictransfer_flag_ = true;
 
-    // if(screen && comm->me == 0) fprintf(screen,"Initializing wall/gran heat transfer model\n");
     fix_cMatrix = static_cast<FixPropertyAtom*>(modify->find_fix_property("cMatrix","property/atom","scalar",1,0,style));
     fix_pwEP = static_cast<FixPropertyAtom*>(modify->find_fix_property("pwEP","property/atom","scalar",1,0,style));
     fix_pwER = static_cast<FixPropertyAtom*>(modify->find_fix_property("pwER","property/atom","scalar",1,0,style,false));
 
     e_cond = static_cast<FixPropertyGlobal*>(modify->find_fix_property("electricalConductivity","property/global","peratomtype",0,0,style))->get_values();
 
-    // if youngsModulusOriginal defined, get deltan_ratio
     Fix* ymo_fix = modify->find_fix_property("youngsModulusOriginal","property/global","peratomtype",0,0,style,false);
-    // deltan_ratio is defined by heat transfer fix, see if there is one
     int n_et = modify->n_fixes_style("heat/gran/electric");
 
-    // get deltan_ratio set by the electric transfer fix
     if(ymo_fix && n_et) deltan_ratio = static_cast<FixPropertyGlobal*>(ymo_fix)->get_array_modified();
 }
+
 /* ---------------------------------------------------------------------- */
 
 void FixWallGran::wall_temperature_unique(bool &has_temp,bool &temp_unique, double &temperature_unique)
@@ -1496,12 +1453,12 @@ void FixWallGran::wall_temperature_unique(bool &has_temp,bool &temp_unique, doub
 
     for(int imesh = 0; imesh < n_FixMesh_; imesh++)
     {
-        
+
         if( (mesh_list()[imesh]->triMesh())->prop().getElementProperty<ScalarContainer<double> >("Temp"))
         {
             has_temp = true;
             temp_unique = false;
-            
+
             return;
         }
         if( (mesh_list()[imesh]->triMesh())->prop().getGlobalProperty<ScalarContainer<double> >("Temp"))
@@ -1520,7 +1477,7 @@ void FixWallGran::wall_temperature_unique(bool &has_temp,bool &temp_unique, doub
     }
 }
 
-
+/* ---------------------------------------------------------------------- */
 
 void FixWallGran::wall_electricPotential_unique(bool &has_ep,bool &ep_unique, double &electricPotential_unique)
 {
@@ -1533,17 +1490,14 @@ void FixWallGran::wall_electricPotential_unique(bool &has_ep,bool &ep_unique, do
         has_ep = true;
         ep_unique = true;
         electricPotential_unique = ep_wall;
-
     }
 
     for(int imesh = 0; imesh < n_FixMesh_; imesh++)
     {
-        
         if( (mesh_list()[imesh]->triMesh())->prop().getElementProperty<ScalarContainer<double> >("electricPotential"))
         {
             has_ep = true;
             ep_unique = false;
-            
             return;
         }
         if( (mesh_list()[imesh]->triMesh())->prop().getGlobalProperty<ScalarContainer<double> >("electricPotential"))
@@ -1566,7 +1520,7 @@ void FixWallGran::wall_electricPotential_unique(bool &has_ep,bool &ep_unique, do
 
 void FixWallGran::addHeatFlux(TriMesh *mesh,int ip, const double ri, double delta_n, double area_ratio)
 {
-    
+
     //r is the distance between the sphere center and wall
     double tcop, tcowall, hc, Acont=0.0, r;
     double reff_wall = ri;
@@ -1586,7 +1540,7 @@ void FixWallGran::addHeatFlux(TriMesh *mesh,int ip, const double ri, double delt
 
     if(CONDUCTION_CONTACT_AREA_OVERLAP == area_calculation_mode_)
     {
-        
+
         if(deltan_ratio)
            delta_n *= deltan_ratio[itype-1][atom_type_wall_-1];
 
@@ -1612,153 +1566,113 @@ void FixWallGran::addHeatFlux(TriMesh *mesh,int ip, const double ri, double delt
         double hf = (Temp_wall-Temp_p[ip]) * hc;
         heatflux[ip] += hf;
         Q_add += hf * update->dt;
-        
+
         if(fppa_htcw)
             fppa_htcw->vector_atom[ip] = hc;
     }
     if(cwl_ && addflag_)
         cwl_->add_heat_wall(ip,(Temp_wall-Temp_p[ip]) * hc);
-    
+
 }
 
-inline double FixWallGran::sigma_at_typeT(int itype, double T) const{
-  // itype is 0-based; T in K
-  const double s0 = (sigma0_ ? sigma0_[itype] : e_cond[itype]);  // fallback to old
-  const double a  = (alpha_  ? alpha_[itype]  : 0.0);
-  // σ(T) = σ0 / (1 + a*(T - Tref))
-  double denom = 1.0 + a*(T - Tref_);
-  if (denom < 1e-6) denom = 1e-6;      // avoid crazy near-zero
-  double s = s0 / denom;
-  if (!std::isfinite(s) || s < sigma_floor_) s = sigma_floor_;
-  return s;
-}
+/* ---------------------------------------------------------------------- */
 
-// Particle–wall electric branch using Hertz + Holm + a-spot.
-// NOTE: σ_p = σ(Temp[ip]); σ_w is constant (no wall temperature used)
-void FixWallGran::addElectricFlux(TriMesh *mesh, int ip,
-                                  const double ri, double delta_n,
-                                  double area_ratio)
+inline double FixWallGran::sigma_at_typeT(int itype, double T) const
 {
-  // ---- wall potential (Dirichlet) ----
-  double ep_wall = 0.0;
-  if (mesh) {
-    auto *ep_ptr = mesh->prop().getGlobalProperty< ScalarContainer<double> >("electricPotential");
-    if (!ep_ptr) return;                     // no electric BC on this mesh
-    ep_wall = (*ep_ptr)(0);
-  } else {
-    if (this->ep_wall < 0.0) return;         // unset on primitive wall ⇒ skip
-    ep_wall = this->ep_wall;
-  }
+    const double s0 = (sigma0_ ? sigma0_[itype] : e_cond[itype]);
+    const double a  = (alpha_  ? alpha_[itype]  : 0.0);
 
-  // ---- LIGGGHTS atom-side accumulators (same arrays your electric fix reads) ----
-  double *pwEP = fix_pwEP->vector_atom;      // diagnostic: last wall V seen
-  double *pwER = fix_pwER->vector_atom;      // Σ G_iw
-  double *cM   = fix_cMatrix->vector_atom;   // Σ (G_iw * Vw)
-  double *Temp = fix_Temp_->vector_atom;
+    double denom = 1.0 + a*(T - Tref_);
+    if (denom < 1e-6) denom = 1e-6;
 
-  // ---- types, conductivities (S/m) ----
-  const int itype = atom->type[ip] - 1;      // particle type (0-based)
-  const int wtype = atom_type_wall_ - 1;     // wall "type" (0-based)
+    double s = s0 / denom;
+    if (!std::isfinite(s) || s < sigma_floor_) s = sigma_floor_;
+    return s;
+}
 
-  // PARTICLE conductivity depends on particle Temp
-  const double Tp    = Temp[ip];
-  const double sig_p = sigma_at_typeT(itype, Tp);            // σ_p(Tp)
+/* ---------------------------------------------------------------------- */
 
-  // WALL conductivity is constant (no Tw)
-  const double sig_w = (sigma0_ ? sigma0_[wtype] : e_cond[wtype]);  // σ_w (const)
-
-  // gate obvious insulators
-  const double SMALL_SIG = 1e-30;
-  if (!(sig_p > SMALL_SIG) || !(sig_w > SMALL_SIG)) return;
-
-  // ---- nominal Hertz sphere–plane radius from overlap (OVERLAP mode) ----
-  double A_nom = 0.0;   // [m^2]
-  double a_nom = 0.0;   // [m]
-
-  if (area_calculation_mode_ == CONDUCTION_CONTACT_AREA_OVERLAP) {
-    // optional overlap correction (same table as thermal side)
-    if (deltan_ratio) {
-      // itype,wtype are already 0-based
-      delta_n *= deltan_ratio[itype][wtype];
-    }
-    if (!(delta_n > 0.0)) return;
-
-    // Hertz (sphere–plane): a = sqrt(R * delta)
-    a_nom = std::sqrt(ri * delta_n);
-
-    // conservative geometric cap (match p–p style)
+void FixWallGran::addElectricFlux(TriMesh *mesh, int ip, const double ri, double delta_n, double area_ratio)
+{
+    double Vw = 0.0;
+    if (mesh)
     {
-      const double a_cap = 0.35 * ri;
-      if (a_nom > a_cap) a_nom = a_cap;
+        ScalarContainer<double> *ep_ptr = mesh->prop().getGlobalProperty< ScalarContainer<double> >("electricPotential");
+        if (!ep_ptr) return;
+        Vw = (*ep_ptr)(0);
+    }
+    else
+    {
+        if (ep_wall < 0.0) return;
+        Vw = ep_wall;
     }
 
-    // apply any extra geometric scaling already in the call site
-    if (area_ratio < 0.0) area_ratio = 0.0;
-    A_nom = M_PI * a_nom * a_nom * area_ratio;
+    double *pwEP = fix_pwEP->vector_atom;
+    double *pwER = fix_pwER->vector_atom;
+    double *cM   = fix_cMatrix->vector_atom;
+    double *Temp = fix_Temp_ ? fix_Temp_->vector_atom : NULL;
 
-    // keep a_nom consistent with A_nom after scaling
-    if (!(A_nom > 0.0)) return;
-    a_nom = std::sqrt(A_nom / M_PI);
+    const int itype = atom->type[ip] - 1;
+    const int wtype = atom_type_wall_ - 1;
 
-  } else if (area_calculation_mode_ == CONDUCTION_CONTACT_AREA_CONSTANT) {
-    A_nom = std::max(0.0, fixed_contact_area_);
-    if (!(A_nom > 0.0)) return;
-    a_nom = std::sqrt(A_nom / M_PI);
+    const double Tp    = Temp ? Temp[ip] : Tref_;
+    const double sig_p = sigma_at_typeT(itype, Tp);
+    const double sig_w = (sigma0_ ? sigma0_[wtype] : e_cond[wtype]);
 
-  } else { // CONDUCTION_CONTACT_AREA_PROJECTION
-    a_nom = ri;
-    if (!(a_nom > 0.0)) return;
-    A_nom = M_PI * a_nom * a_nom;
-  }
+    if (!(sig_p > 1e-30) || !(sig_w > 1e-30)) return;
 
-  if (!(A_nom > 0.0) || !(a_nom > 0.0) || !std::isfinite(a_nom)) return;
+    double A_nom = 0.0;
+    double a_nom = 0.0;
 
-  // ---- read the shared a-spot fraction knob ------------------------------
-  // Preferred: `fix ... property/global electricalAspotFraction peratomtype ...`
-  // Also accepts scalar, or (legacy) aSpotFractionPW / aSpotFraction. Default 1.0.
-  double f_pw = 1.0;
-  if (auto *fix_f_pt = static_cast<FixPropertyGlobal*>(
-          modify->find_fix_property("electricalAspotFraction","property/global","peratomtype",0,0,style,false))) {
-    const double *vals = fix_f_pt->get_values();
-    f_pw = vals[itype];                       // <-- itype is already 0-based
-  } else if (auto *fix_f_sc = static_cast<FixPropertyGlobal*>(
-               modify->find_fix_property("electricalAspotFraction","property/global","scalar",0,0,style,false))) {
-    f_pw = fix_f_sc->compute_scalar();
-  } else if (auto *fix_alt_pt = static_cast<FixPropertyGlobal*>(
-               modify->find_fix_property("aSpotFractionPW","property/global","peratomtype",0,0,style,false))) {
-    const double *vals = fix_alt_pt->get_values();
-    f_pw = vals[itype];                       // <-- 0-based
-  } else if (auto *fix_alt_sc = static_cast<FixPropertyGlobal*>(
-               modify->find_fix_property("aSpotFraction","property/global","scalar",0,0,style,false))) {
-    f_pw = fix_alt_sc->compute_scalar();
-  }
+    if (area_calculation_mode_ == CONDUCTION_CONTACT_AREA_OVERLAP)
+    {
+        if (deltan_ratio)
+            delta_n *= deltan_ratio[itype][wtype];
+        if (!(delta_n > 0.0)) return;
 
-  // clamp & sanitize (typical metallic fractions can be ~1e-6 ... 1e-3)
-  if (!std::isfinite(f_pw)) f_pw = 1.0;
-  const double fmin = 1e-10, fmax = 1.0;
-  if (f_pw < fmin) f_pw = fmin;
-  if (f_pw > fmax) f_pw = fmax;
+        a_nom = std::sqrt(ri * delta_n);
 
-  // effective metallic a-spot radius
-  const double a_eff = std::sqrt(f_pw) * a_nom;
-  if (!(a_eff > 0.0) || !std::isfinite(a_eff)) return;
+        const double a_cap = 0.35 * ri;
+        if (a_nom > a_cap) a_nom = a_cap;
 
-  // ---- Holm constriction (sphere–plane), no interfacial film ----
-  // Ri = 1/(2 a σ_p), Rw = 1/(2 a σ_w)  ⇒  G = 1/(Ri+Rw)
-  const double Ri   = 1.0 / (2.0 * a_eff * sig_p);
-  const double Rw   = 1.0 / (2.0 * a_eff * sig_w);
-  const double Rtot = Ri + Rw;
-  if (!(Rtot > 0.0) || !std::isfinite(Rtot)) return;
+        if (area_ratio < 0.0) area_ratio = 0.0;
+        A_nom = M_PI * a_nom * a_nom * area_ratio;
 
-  const double G = 1.0 / Rtot;                               // [Siemens = A/V]
-  if (!std::isfinite(G) /*|| (G < Cmin_branch_)*/ ) return;  // optional pruning if you expose Gmin on wall side
+        if (!(A_nom > 0.0)) return;
+        a_nom = std::sqrt(A_nom / M_PI);
+    }
+    else if (area_calculation_mode_ == CONDUCTION_CONTACT_AREA_CONSTANT)
+    {
+        A_nom = std::max(0.0, fixed_contact_area_);
+        if (!(A_nom > 0.0)) return;
+        a_nom = std::sqrt(A_nom / M_PI);
+    }
+    else
+    {
+        a_nom = ri;
+        if (!(a_nom > 0.0)) return;
+        A_nom = M_PI * a_nom * a_nom;
+    }
 
-  // Optional debug:
-  // std::cout << "p-w G=" << G << " a_eff=" << a_eff
-  //           << " f=" << f_pw << " sig_p=" << sig_p << " sig_w=" << sig_w << "\n";
+    if (!(A_nom > 0.0) || !(a_nom > 0.0) || !std::isfinite(a_nom)) return;
 
-  // ---- accumulate wall branch ----
-  pwER[ip] += G;                   // Σ G_iw
-  cM[ip]   += G * ep_wall;         // Σ (G_iw Vw)
-  pwEP[ip]  = ep_wall;             // diagnostic
+    double f_pw = aspotFrac_ ? aspotFrac_[itype] : aspot_fraction_global_;
+    if (!std::isfinite(f_pw)) f_pw = 1.0;
+    if (f_pw < 1e-10) f_pw = 1e-10;
+    if (f_pw > 1.0)   f_pw = 1.0;
+
+    const double a_eff = std::sqrt(f_pw) * a_nom;
+    if (!(a_eff > 0.0) || !std::isfinite(a_eff)) return;
+
+    const double Rp   = 1.0 / (2.0 * a_eff * sig_p);
+    const double Rw   = 1.0 / (2.0 * a_eff * sig_w);
+    const double Rtot = Rp + Rw;
+    if (!(Rtot > 0.0) || !std::isfinite(Rtot)) return;
+
+    const double G = 1.0 / Rtot;
+    if (!std::isfinite(G)) return;
+
+    pwER[ip] += G;
+    cM[ip]   += G * Vw;
+    pwEP[ip]  = Vw;
 }
