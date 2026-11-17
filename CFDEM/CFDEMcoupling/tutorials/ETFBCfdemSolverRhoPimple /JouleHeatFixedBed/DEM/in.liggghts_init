@@ -8,7 +8,8 @@
 #=============================== PARAMETERS ===================================#
 
 #------- Paths ----------------------------------------------------------------#
-variable dir       string ../DEM     # case folder (meshes, post/, log)
+variable dir       string ../DEM     # case folder (post/, log)
+variable meshDir   string ../DEM     # STL folder of the init stage (insertion face = top_plate.stl)
 
 #------- Geometry / insertion -------------------------------------------------#
 variable Rbox      equal 0.024       # simulation box radius (tube inner radius) [m]
@@ -20,7 +21,7 @@ variable insRate   equal 10          # insertion rate                           
 variable insEvery  equal 5000        # insert every N steps                       [steps]
 variable vIns      equal -0.8        # insertion velocity (z)                     [m/s]
 
-#------- Mechanical  ----------------------------------------------------------#
+#------- Mechanical (Hertz uses Y, nu, e, mu) ---------------------------------#
 variable YP        equal 1.9e8       # Young's modulus particles (reduced)        [Pa]
 variable YW2       equal 1.9e8       # Young's modulus electrode plates (reduced) [Pa]
 variable YW3       equal 1.9e8       # Young's modulus glass wall (reduced)       [Pa]
@@ -47,13 +48,13 @@ variable epsW3     equal 0.6         # emissivity glass                         
 variable T0        equal 296         # initial particle temperature               [K]
 variable Twall     equal 296         # wall temperature                           [K]
 
-#------- Electrical------------------------------#
-variable ECP       equal 4.28e6      # el. conductivity particles                 [S/m]
-variable ECW2      equal 4.28e6      # el. conductivity electrode plates          [S/m]
+#------- Electrical -----------------------------------------------------------#
+variable ECP       equal 4.28e5      # el. conductivity particles                 [S/m]
+variable ECW2      equal 4.26e5      # el. conductivity electrode plates          [S/m]
 variable ECW3      equal 1.0e-10     # el. conductivity glass                     [S/m]
-variable aSpot     equal 1.0         # a-spot fraction (all types)                [-]
+variable aSpot     equal 6.0e-2      # a-spot fraction (all types)                [-]
 variable Vbot      equal 0.0         # bottom plate potential                     [V]
-variable Vtop      equal 1.0         # top plate potential                        [V]
+variable Vtop      equal 0.8         # top plate potential                        [V]
 variable tJouleOff equal 1.0e9       # start_time far beyond this run -> no Joule heating while filling [s]
 
 #------- Numerics / output ----------------------------------------------------#
@@ -124,9 +125,9 @@ fix         gravi all gravity ${g} vector 0.0 0.0 -1.0
 
 #=================================== WALLS ====================================#
 
-fix  cad1 all mesh/surface file ${dir}/wall_cyl.stl     type 3 scale 1 temperature ${Twall}
-fix  cad2 all mesh/surface file ${dir}/bottom_plate.stl type 2 scale 1 temperature ${Twall} electricPotential ${Vbot}
-fix  cad3 all mesh/surface file ${dir}/top_plate.stl    type 2 scale 1 temperature ${Twall} electricPotential ${Vtop} move 0. 0. 0.
+fix  cad1 all mesh/surface file ${meshDir}/wall_cyl.stl     type 3 scale 1 temperature ${Twall}
+fix  cad2 all mesh/surface file ${meshDir}/bottom_plate.stl type 2 scale 1 temperature ${Twall} electricPotential ${Vbot}
+fix  cad3 all mesh/surface file ${meshDir}/top_plate.stl    type 2 scale 1 temperature ${Twall} electricPotential ${Vtop} move 0. 0. 0.
 fix  geometry all wall/gran model hertz tangential history mesh n_meshes 3 meshes cad1 cad2 cad3
 
 #=============================== HEAT TRANSFER ================================#
