@@ -1,212 +1,183 @@
 /* ----------------------------------------------------------------------
-   LIGGGHTS / LAMMPS — fix_heat_gran_electric6.h
-   Electric + thermal coupling for granular materials
+    LIGGGHTS® - DEM simulation engine, DCS Computing GmbH, Linz, Austria
+    http://www.dcs-computing.com, office@dcs-computing.com
+
+    LIGGGHTS® is open-source, distributed under the terms of the GNU Public
+    License, version 2 or later. See the top-level README and LICENSE files.
+
+    Copyright 2024-     LCT - UGENT, Ghent
+    Copyright 2012-     DCS Computing GmbH, Linz
+    Copyright 2009-2012 JKU Linz
 ------------------------------------------------------------------------- */
 
-#include <vector>
-#include <unordered_map>
-
-#include <map>
-#include <set>
-
 #ifdef FIX_CLASS
+
 FixStyle(heat/gran/electric,FixHeatGranElectric)
-FixStyle(heat/gran,FixHeatGranElectric)
+
 #else
 
 #ifndef LMP_FIX_HEATGRAN_ELECTRIC_H
 #define LMP_FIX_HEATGRAN_ELECTRIC_H
 
 #include "fix_heat_gran.h"
+#include "fix_wall_gran.h"
+#include <vector>
 
 namespace LAMMPS_NS {
 
-class ComputePairGranLocal;
-class FixWallGran;
-class FixPropertyAtom;
-class FixPropertyGlobal;
-class RanMars;
+  class FixHeatGranElectric : public FixHeatGran {
+  public:
+    FixHeatGranElectric(class LAMMPS *, int, char **);
+    ~FixHeatGranElectric();
+    virtual void post_create();
+    virtual void pre_delete(bool);
 
-class FixHeatGranElectric : public FixHeatGran {
-public:
-  FixHeatGranElectric(class LAMMPS *, int, char **);
-  ~FixHeatGranElectric() override;
+    int setmask();
+    void init();
+    virtual void pre_force(int vflag);
+    virtual void post_force(int vflag);
+    virtual void end_of_step();
 
-  void post_create() override;
-  void pre_delete(bool) override;
+    virtual void cpl_evaluate(class ComputePairGranLocal *);
+    void register_compute_pair_local(class ComputePairGranLocal *);
+    void unregister_compute_pair_local(class ComputePairGranLocal *);
 
-  int  setmask() override;
-  void init() override;
-  void pre_force(int vflag) override;
-  void post_force(int vflag) override;
+    virtual void updatePtrs();
 
-  void cpl_evaluate(ComputePairGranLocal *caller);
-  void register_compute_pair_local(ComputePairGranLocal *);
-  void unregister_compute_pair_local(ComputePairGranLocal *);
-  
-  void updatePtrs();
+  protected:
+    struct EdgeCG { int i, j; double G; double fi; };
 
-  void end_of_step();  // new
-  template<int HISTFLAG,int CONTACTAREA>
-  double conductanceLocalIJ(int i, int j);
+    int iarg_ = 0;
 
-  template<int HISTFLAG,int CONTACTAREA>
-  void detectedComponentsParallel();
+    template <int,int> void post_force_eval(int,int);
+    template <int,int> void electric_end_step_impl();
+    template <int,int> void buildEdgeCache();
+    template <int,int> void detectedComponentsParallel();
+    template <int,int> void iterativeDomainDecompSolve();
+    template <int,int> void calculateJouleHeat();
+    template <int,int> double conductanceLocalIJ(const int i, const int j, double &fi);
 
-  template<int HISTFLAG,int CONTACTAREA>
-  void iterativeDomainDecompSolve();
+    bool type_is_conductive(int itype) const;
+    double sigma_at_typeT(int itype, double T) const;
+    double aspot_fraction_for_types(int ti, int tj) const;
+    void recoverG0G1(double Gw, double cM, double V0, double V1, double &G0, double &G1);
+    int  uf_find(std::vector<int> &p, int x);
+    void uf_union(std::vector<int> &p, std::vector<int> &sz, int a, int b);
+    void buildLocalIC0();
+    void applyPrecond(const std::vector<double> &r, std::vector<double> &z);
 
-  template<int HISTFLAG,int CONTACTAREA>
-  void calculateJouleHeat();
+    void calculateRadiation();
+    void randOnSphere(const double *c, double r, double *ansP, double *ansD);
+    void randDir(const double *n, double *d);
+    int  trace(int orig_id, int ibin, double *o, double *d, double *buffer3, double *hitp);
+    void reflect(int radID, int orig_id, int ibin, double *o, double *d, double flux, double accum_eps, int n, double *buffer3);
+    int  nextBin(int ibin, const double *o, const double *d, double *p, int &dx, int &dy, int &dz);
+    bool intersectRaySphere(const double *o, const double *d, const double *center, double radius, double &t, double *buffer3);
+    void createStencils();
+    void addscaled3(const double *v1, const double *v2, double s, double *ans);
 
-  // Radiation
-  void   calculateRadiation();
-  void   addscaled3(const double *, const double*, double, double*);
-  bool   intersectRaySphere(const double *, const double *, const double *, double, double &, double *);
-  int    nextBin(int, const double *, const double *, double *, int &, int &, int &);
-  int    trace(int, int, double *, double *, double *, double *);
-  void   randDir(const double *, double *);
-  void   randOnSphere(const double *, double, double *, double *);
-  void   reflect(int, int, int, double *, double *, double, double, int, double *);
-  void   createStencils();
+    class FixPropertyGlobal *fix_eConductivity_ = NULL;
+    double *eConductivity_ = NULL;
 
-  // in class FixHeatGranElectric:
-  double aspot_fraction_global_;                // default 1.0 (no reduction)
-  FixPropertyGlobal *fix_aspotFrac_;            // optional per-atom-type values
-  const double *aspotFrac_;                           // pointer returned by fix_aspotFrac_
-  double Cmin_branch_;                          // optional tiny cutoff for G (stability)
+    bool store_contact_data_ = false;
+    class FixPropertyAtom *fix_conduction_contact_area_ = NULL;
+    class FixPropertyAtom *fix_n_conduction_contacts_ = NULL;
+    class FixPropertyAtom *fix_wall_heattransfer_coeff_ = NULL;
+    class FixPropertyAtom *fix_wall_temperature_ = NULL;
+    class FixPropertyAtom *fix_wall_electricPotential_ = NULL;
+    double *conduction_contact_area_ = NULL;
+    double *n_conduction_contacts_ = NULL;
+    double *wall_heattransfer_coeff_ = NULL;
+    double *wall_temp_ = NULL;
+    double *wall_ep_ = NULL;
 
-  FixPropertyAtom *fix_total_C  = nullptr;
-  FixPropertyAtom *fix_countCheck = nullptr;
-  
-  const double *sigma0_;       // peratomtype σ at Tref  [S/m]
-  const double *alpha_;        // peratomtype temp coeff [1/K]
-  double        Tref_;         // scalar reference temp  [K]
-  double        sigma_floor_;  // floor, e.g. 1e-12 S/m
+    int area_calculation_mode_ = 0;
+    double fixed_contact_area_ = 0.;
+    int area_correction_flag_ = 0;
+    double const* const* deltan_ratio_ = NULL;
 
-  inline bool type_is_conductive(int) const; 
-  inline double sigma_at_typeT(int, double) const;
+    bool electricMode_ = false;
+    const double *e_cond = NULL;
+    class FixWallGran *wallfix = NULL;
 
-  // logging stride for CSV export (>=1)
-  int electric_log_stride_;
+    class FixPropertyAtom *fix_eP = NULL;
+    class FixPropertyAtom *fix_eP_old = NULL;
+    class FixPropertyAtom *fix_deltaE = NULL;
+    class FixPropertyAtom *fix_qj = NULL;
+    class FixPropertyAtom *fix_qj_pp = NULL;
+    class FixPropertyAtom *fix_qj_pw = NULL;
+    class FixPropertyAtom *fix_qr = NULL;
+    class FixPropertyAtom *fix_tot_I = NULL;
+    class FixPropertyAtom *fix_current = NULL;
+    class FixPropertyAtom *fix_compID = NULL;
+    class FixPropertyAtom *fix_rhsG = NULL;
+    class FixPropertyAtom *fix_diagFlag = NULL;
+    class FixPropertyAtom *fix_total_C = NULL;
+    class FixPropertyAtom *fix_countCheck = NULL;
+    class FixPropertyAtom *fix_cMatrix = NULL;
+    class FixPropertyAtom *fix_pwER = NULL;
+    class FixPropertyAtom *fix_pwEP = NULL;
 
-private:
+    double *eP = NULL;
+    double *eP_old = NULL;
+    double *qr = NULL;
+    double eP0 = 0.;
+    bool eP_needs_init_ = false;
 
-  template<int HISTFLAG, int CONTACTAREA>
-  inline void electric_end_step_impl();  // new helper
-  
-  inline double aspot_fraction_for_types(int, int) const;
+    double joule_heat_startTime = 0.;
+    bool temp_control_flag_ = false;
+    double temp_control_ = 0.;
+    int electric_log_stride_ = 1;
 
-  // global/per-type thermal
-  FixPropertyGlobal *fix_eConductivity_ = nullptr;
-  double *eConductivity_ = nullptr;
+    double aspot_fraction_global_ = 1.0;
+    class FixPropertyGlobal *fix_aspotFrac_ = NULL;
+    const double *aspotFrac_ = NULL;
+    double Cmin_branch_ = 0.0;
+    const double *sigma0_ = NULL;
+    const double *alpha_ = NULL;
+    double Tref_ = 293.15;
+    double sigma_floor_ = 1e-12;
 
-  bool    store_contact_data_ = false;
-  FixPropertyAtom *fix_conduction_contact_area_ = nullptr;
-  FixPropertyAtom *fix_n_conduction_contacts_   = nullptr;
-  FixPropertyAtom *fix_wall_heattransfer_coeff_ = nullptr;
-  FixPropertyAtom *fix_wall_temperature_        = nullptr;
-  double *conduction_contact_area_ = nullptr;
-  double *n_conduction_contacts_   = nullptr;
-  double *wall_heattransfer_coeff_ = nullptr;
-  double *wall_temp_               = nullptr;
+    double elec_contact_factor_ = 1.0;
+    double elec_min_overlap_frac_ = 0.0;
+    bool elec_min_overlap_set_ = false;
 
-  // electric / wall-electrics
-  FixPropertyAtom *fix_wall_electricPotential_ = nullptr;
-   
-  FixWallGran     *wallfix = nullptr;
-  double *wall_ep_ = nullptr;
+    std::vector<EdgeCG> edges_;
+    std::vector<int> esolve_;
+    double V0_global_ = 0.;
+    double V1_global_ = 0.;
+    bool two_terminal_ = false;
+    std::vector<char> active_;
 
-  // particle potentials (new/old) and flags
-  FixPropertyAtom *fix_eP     = nullptr;
-  FixPropertyAtom *fix_eP_old = nullptr;
-  double *eP     = nullptr;
-  double *eP_old = nullptr;
-  double  eP0    = 0.0;
-  bool eP_needs_init_;	//flag for restart and initialization of Temp
+    std::vector<int> uf_p_, uf_sz_;
+    std::vector<double> uf_rootA_, uf_rootK_;
 
-  // Joule / radiation accumulators
-  FixPropertyAtom *fix_qj     = nullptr;
-  FixPropertyAtom *fix_qj_pp  = nullptr;
-  FixPropertyAtom *fix_qj_pw  = nullptr;
-  FixPropertyAtom *fix_qr     = nullptr;
-  FixPropertyAtom *fix_tot_I     = nullptr;
-  double *qj = nullptr;
-  double *qr = nullptr;
-  double *tot_I = nullptr;
+    std::vector<double> cg_diag_, cg_x_, cg_r_, cg_z_, cg_p_, cg_Ap_, cg_Vbk_;
 
-  // misc flags / diagnostics
-  bool hasEPArgs = true;
-  bool electricMode_ = false;
+    int ic_n_ = 0;
+    bool ic_ok_ = false;
+    std::vector<int> ic_map_, ic_inv_, ic_mark_;
+    std::vector<int> icLp_, icLj_, icCp_, icCi_, icCq_;
+    std::vector<double> icLx0_, icLx_, icLd_, icAd_, ic_w_, ic_y_;
 
-  // area modes for thermal contact
-  enum { CONDUCTION_CONTACT_AREA_OVERLAP=0,
-         CONDUCTION_CONTACT_AREA_CONSTANT,
-         CONDUCTION_CONTACT_AREA_PROJECTION };
-  int    area_calculation_mode_ = CONDUCTION_CONTACT_AREA_OVERLAP;
-  double fixed_contact_area_    = 0.0;
-  int    area_correction_flag_  = 0;
+    bool radiation_flag_ = false;
+    const double *emissivity_ = NULL;
+    double TB = 0.;
+    double Sigma = 5.670373E-8;
+    double cutGhost = 0.10;
+    double cutGhostsq = 0.01;
+    class RanMars *RGen = NULL;
+    double *raypoint = NULL;
+    int *stencilLength = NULL;
+    int *binStencildx = NULL;
+    int *binStencilmdx = NULL;
+    int *binStencildy = NULL;
+    int *binStencilmdy = NULL;
+    int *binStencildz = NULL;
+    int *binStencilmdz = NULL;
+  };
 
-  double joule_heat_startTime = 0.0;
+}
 
-  bool   temp_control_flag_ = false;
-  double temp_control_      = 0.0;
-
-  // radiation params
-  double TB          = 0.0;
-  double Sigma       = 5.670373e-8;
-  double cutGhost    = 0.10;
-  double cutGhostsq  = 0.01;
-  bool   radiation_flag_ = false;
-
- 
-  FixPropertyGlobal *fix_emissivity_ = nullptr;
-  const double *emissivity_ = nullptr;          
-
-  // component labeling helpers
-  int *compID = nullptr;
-
-  // area-correction look-up
-  const double * const * deltan_ratio_ = nullptr;
-
-  // parser index
-  int iarg_ = 0;
-
-  // per-type electrical conductivity
-  FixPropertyGlobal *fix_econductivity_ = nullptr;
-  const double *e_cond = nullptr;
-
-  // per-atom props referenced in .cpp
-  FixPropertyAtom *fix_current  = nullptr;  // vector
-  FixPropertyAtom *fix_compID   = nullptr;  // scalar
-  FixPropertyAtom *fix_rhsG     = nullptr;  // scalar
-  FixPropertyAtom *fix_diagFlag = nullptr;  // scalar
-  FixPropertyAtom *fix_pwER     = nullptr;  // Σ Cw
-  FixPropertyAtom *fix_pwEP     = nullptr;  // eff Vw (diag)
-  FixPropertyAtom *fix_pwEC     = nullptr;  // conductive flag
-  FixPropertyAtom *fix_cMatrix  = nullptr;  // Σ Cw·Vw
-  FixPropertyAtom *fix_deltaE   = nullptr;  // optional
-
-  // RNG + radiation helpers
-  RanMars *RGen = nullptr;
-  double  *raypoint = nullptr;
-
-  // radiation stencils
-  int *stencilLength = nullptr;
-  int *binStencildx  = nullptr;
-  int *binStencilmdx = nullptr;
-  int *binStencildy  = nullptr;
-  int *binStencilmdy = nullptr;
-  int *binStencildz  = nullptr;
-  int *binStencilmdz = nullptr;
-
-  // templated heat eval
-  template<int HISTFLAG,int CONTACTAREA>
-  void post_force_eval(int vflag,int cpl_flag);
-};
-
-} // namespace LAMMPS_NS
-
-#endif // LMP_FIX_HEATGRAN_ELECTRIC_H
-#endif // FIX_CLASS
-
+#endif
+#endif
