@@ -1,6 +1,74 @@
+################################################################################
+#  Fixed bed (steel spheres, Lu et al. 2022 set-up) - LIGGGHTS INIT input
+#  Fills the tube, lets the bed settle and writes the restart for in.liggghts_run.
+#  Joule heating is OFF during filling (start_time > end of this run).
+#  Atom types: 1 = steel particles | 2 = electrode plates | 3 = glass tube wall
+################################################################################
+
+#=============================== PARAMETERS ===================================#
+
+#------- Paths ----------------------------------------------------------------#
+variable dir       string ../DEM     # case folder (meshes, post/, log)
+
+#------- Geometry / insertion -------------------------------------------------#
+variable Rbox      equal 0.024       # simulation box radius (tube inner radius) [m]
+variable Hbox      equal 0.5         # simulation box height                      [m]
+variable rP        equal 0.00635     # particle radius (d = 12.7 mm)              [m]
+variable rhoP      equal 7800        # particle density                           [kg/m3]
+variable nP        equal 86          # number of particles                        [-]
+variable insRate   equal 10          # insertion rate                             [1/s]
+variable insEvery  equal 5000        # insert every N steps                       [steps]
+variable vIns      equal -0.8        # insertion velocity (z)                     [m/s]
+
+#------- Mechanical  ----------------------------------------------------------#
+variable YP        equal 1.9e8       # Young's modulus particles (reduced)        [Pa]
+variable YW2       equal 1.9e8       # Young's modulus electrode plates (reduced) [Pa]
+variable YW3       equal 1.9e8       # Young's modulus glass wall (reduced)       [Pa]
+variable nu        equal 0.27        # Poisson ratio (all types)                  [-]
+variable ePP       equal 0.98        # restitution particle-particle              [-]
+variable ePW       equal 0.98        # restitution particle-wall                  [-]
+variable muPP      equal 0.1         # friction particle-particle                 [-]
+variable muPW      equal 0.3         # friction particle-wall                     [-]
+variable kn        equal 2e5         # normal stiffness   (only used with model hooke)
+variable kt        equal 1e5         # tangential stiff.  (only used with model hooke)
+variable gn        equal 600         # normal damping     (only used with model hooke)
+variable gt        equal 600         # tangential damping (only used with model hooke)
+
+#------- Thermal --------------------------------------------------------------#
+variable kP        equal 43.0        # thermal conductivity particles             [W/m/K]
+variable kW2       equal 43.0        # thermal conductivity electrode plates      [W/m/K]
+variable kW3       equal 0.8         # thermal conductivity glass                 [W/m/K]
+variable cpP       equal 448.0       # heat capacity particles                    [J/kg/K]
+variable cpW2      equal 448.0       # heat capacity electrode plates             [J/kg/K]
+variable cpW3      equal 840.0       # heat capacity glass                        [J/kg/K]
+variable epsP      equal 0.8         # emissivity particles                       [-]
+variable epsW2     equal 0.8         # emissivity electrode plates                [-]
+variable epsW3     equal 0.6         # emissivity glass                           [-]
+variable T0        equal 296         # initial particle temperature               [K]
+variable Twall     equal 296         # wall temperature                           [K]
+
+#------- Electrical------------------------------#
+variable ECP       equal 4.28e6      # el. conductivity particles                 [S/m]
+variable ECW2      equal 4.28e6      # el. conductivity electrode plates          [S/m]
+variable ECW3      equal 1.0e-10     # el. conductivity glass                     [S/m]
+variable aSpot     equal 1.0         # a-spot fraction (all types)                [-]
+variable Vbot      equal 0.0         # bottom plate potential                     [V]
+variable Vtop      equal 1.0         # top plate potential                        [V]
+variable tJouleOff equal 1.0e9       # start_time far beyond this run -> no Joule heating while filling [s]
+
+#------- Numerics / output ----------------------------------------------------#
+variable skin      equal 0.01        # neighbour skin                             [m]
+variable dt        equal 5.0e-5      # DEM timestep                               [s]
+variable g         equal 9.81        # gravity                                    [m/s2]
+variable nSteps    equal 200000      # total steps of the init run (upto)
+variable nThermo   equal 1000
+variable nDump     equal 1000
+
+#================================ SETUP =======================================#
+
 echo            both
-log             ../DEM/log.liggghts
-thermo_log      ../DEM/post/thermo.txt
+log             ${dir}/log.liggghts
+thermo_log      ${dir}/post/thermo.txt
 
 atom_style      granular
 atom_modify     map array
@@ -12,76 +80,84 @@ newton          off
 units           si
 processors      1 1 1
 
-#region          reg block -0.025 0.025 -0.025 0.025 0.0 0.11 units box
-region 	reg cylinder z 0 0 0.024 0 0.5 units box
+region          reg cylinder z 0 0 ${Rbox} 0 ${Hbox} units box
 create_box      3 reg
 
-neighbor        0.01 bin
+neighbor        ${skin} bin
 neigh_modify    delay 0
 
+#=========================== MATERIAL PROPERTIES ==============================#
 
-# Material properties required for granular pair styles
+fix  m1 all property/global youngsModulus peratomtype ${YP} ${YW2} ${YW3}
+fix  m2 all property/global poissonsRatio peratomtype ${nu} ${nu} ${nu}
+fix  m3 all property/global coefficientRestitution peratomtypepair 3 &
+     ${ePP} ${ePW} ${ePW} &
+     ${ePW} ${ePW} ${ePW} &
+     ${ePW} ${ePW} ${ePW}
+fix  m4 all property/global coefficientFriction peratomtypepair 3 &
+     ${muPP} ${muPW} ${muPW} &
+     ${muPW} ${muPW} ${muPW} &
+     ${muPW} ${muPW} ${muPW}
+fix  m5 all property/global kn peratomtypepair 3 ${kn} ${kn} ${kn} ${kn} ${kn} ${kn} ${kn} ${kn} ${kn}
+fix  m6 all property/global kt peratomtypepair 3 ${kt} ${kt} ${kt} ${kt} ${kt} ${kt} ${kt} ${kt} ${kt}
+fix  m7 all property/global gamman peratomtypepair 3 ${gn} ${gn} ${gn} ${gn} ${gn} ${gn} ${gn} ${gn} ${gn}
+fix  m8 all property/global gammat peratomtypepair 3 ${gt} ${gt} ${gt} ${gt} ${gt} ${gt} ${gt} ${gt} ${gt}
 
-fix 		m1 all property/global youngsModulus peratomtype 1.9e8 1.9e8 1.9e8  #5e6 
-fix 		m2 all property/global poissonsRatio peratomtype 0.27 0.27 0.27
-fix 		m3 all property/global coefficientRestitution peratomtypepair 3 0.98 0.98 0.98 0.98 0.98 0.98 0.98 0.98 0.98 #0.45 #0.98
-fix 		m4 all property/global coefficientFriction peratomtypepair 3 0.1 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 #0.1 0.3 0.3 0.1
-fix		m5 all property/global kn peratomtypepair 3 2e5 2e5 2e5 2e5 2e5 2e5 2e5 2e5 2e5 
-fix		m6 all property/global kt peratomtypepair 3 1e5 1e5 1e5 1e5 1e5 1e5 1e5 1e5 1e5
-fix		m7 all property/global gamman peratomtypepair 3 600 600 600 600 600 600 600 600 600
-fix		m8 all property/global gammat peratomtypepair 3 600 600 600 600 600 600 600 600 600
-fix         	m9 all property/global electricalConductivity peratomtype 4.28e6 4.28e6 1e-10	 #Ohm
-fix	    	m10 all property/global thermalEmissivity peratomtype 0.8 0.8 0.6 #Ohm.m
-fix 	    	m11 all property/global electricalAspotFraction peratomtype 1.0 1.0 1.0
+fix  m9  all property/global electricalConductivity  peratomtype ${ECP}  ${ECW2}  ${ECW3}   # [S/m]
+fix  m10 all property/global thermalEmissivity       peratomtype ${epsP} ${epsW2} ${epsW3}  # [-]
+fix  m11 all property/global electricalAspotFraction peratomtype ${aSpot} ${aSpot} ${aSpot} # [-]
 
-fix	   	eP all property/atom eP scalar yes yes no 0.0 		#electricPotential of particles
-fix  	    	qj all property/atom jouleHeat scalar yes yes no 0.0
-fix	    	cMatrix all property/atom cMatrix scalar yes yes no 0.0
-fix	    	pwEP all property/atom pwEP scalar yes yes no 0.0
-fix	    	pwER all property/atom pwER scalar yes yes no 0.0
+# Per-atom fields read by heat/gran/electric (names and IDs must stay identical in the run file)
+fix  eP      all property/atom eP      scalar yes yes no 0.0
+fix  qj      all property/atom qj      scalar yes yes no 0.0
+fix  cMatrix all property/atom cMatrix scalar yes yes no 0.0
+fix  pwEP    all property/atom pwEP    scalar yes yes no 0.0
+fix  pwER    all property/atom pwER    scalar yes yes no 0.0
 
-# pair style
-pair_style  gran model hertz tangential history # Hertzian without cohesion
+#=============================== CONTACT MODEL ================================#
 
+pair_style  gran model hertz tangential history
 pair_coeff  * *
 
-# timestep, gravity
-timestep    0.00005
-fix         gravi all gravity 9.81 vector 0.0 0.0 -1.0
+timestep    ${dt}
+fix         gravi all gravity ${g} vector 0.0 0.0 -1.0
 
-# walls
-fix	cad1 all mesh/surface file ../DEM/wall_cyl.stl type 3 scale 1 temperature 296
-fix	cad2 all mesh/surface file ../DEM/bottom_plate.stl type 2 scale 1 temperature 296 electricPotential 0
-fix	cad3 all mesh/surface file ../DEM/top_plate.stl type 2 scale 1 temperature 296 electricPotential 1 move 0. 0. 0.
-fix	geometry all wall/gran model hertz tangential history mesh n_meshes 3 meshes cad1 cad2 cad3
+#=================================== WALLS ====================================#
 
-# heat transfer
-fix	ftco all property/global thermalConductivity peratomtype 43. 43. 0.8.# lambda in [W/(K*m)]
-fix	ftca all property/global thermalCapacity peratomtype 448. 448. 840 # cp in [J/(kg*K)]
-fix	electransfer all heat/gran/electric initial_temperature 296 initial_electricPotential 0. start_time 0.0 radiation no
+fix  cad1 all mesh/surface file ${dir}/wall_cyl.stl     type 3 scale 1 temperature ${Twall}
+fix  cad2 all mesh/surface file ${dir}/bottom_plate.stl type 2 scale 1 temperature ${Twall} electricPotential ${Vbot}
+fix  cad3 all mesh/surface file ${dir}/top_plate.stl    type 2 scale 1 temperature ${Twall} electricPotential ${Vtop} move 0. 0. 0.
+fix  geometry all wall/gran model hertz tangential history mesh n_meshes 3 meshes cad1 cad2 cad3
 
-# particle distributions and insertion
-region  bc block -0.02 0.02 -0.02 0.02 0 0.11 units box
-fix     pts1 all particletemplate/sphere 15485863 atom_type 1 density constant 7800 radius constant 0.00635
-fix     pdd1 all particledistribution/discrete 15485867 1 pts1 1. 
+#=============================== HEAT TRANSFER ================================#
 
-fix    ins all insert/stream seed 32452867 distributiontemplate pdd1 &
-       nparticles 86 particlerate 10 insert_every 5000 overlapcheck yes all_in no vel constant 0.0 0.0 -0.8 &
-       insertion_face cad3 
+fix  ftco all property/global thermalConductivity peratomtype ${kP}  ${kW2}  ${kW3}    # [W/(m K)]
+fix  ftca all property/global thermalCapacity     peratomtype ${cpP} ${cpW2} ${cpW3}   # [J/(kg K)]
+fix  electransfer all heat/gran/electric initial_temperature ${T0} initial_electricPotential 0. &
+     start_time ${tJouleOff} radiation no
 
-# apply nve integration to all particles that are inserted as single particles
-fix     integr all nve/sphere
+#========================= PARTICLE INSERTION =================================#
 
-# screen output
+fix  pts1 all particletemplate/sphere 15485863 atom_type 1 density constant ${rhoP} radius constant ${rP}
+fix  pdd1 all particledistribution/discrete 15485867 1 pts1 1.
+
+fix  ins all insert/stream seed 32452867 distributiontemplate pdd1 &
+     nparticles ${nP} particlerate ${insRate} insert_every ${insEvery} overlapcheck yes all_in no &
+     vel constant 0.0 0.0 ${vIns} insertion_face cad3
+
+fix  integr all nve/sphere
+
+#================================ OUTPUT ======================================#
+
 compute         rke all erotate/sphere
 thermo_style    custom step atoms ke c_rke vol
-thermo          1000
+thermo          ${nThermo}
 thermo_modify   lost ignore norm no
 compute_modify  thermo_temp dynamic yes
 
-# insert the first particles so that dump is not empty
 run         1
-dump        dmpvtk all custom/vtk 1000 post/dump_liggghts_init*.vtk id x y z radius mass f_Temp[0] f_heatFlux[0] f_heatSource[0] #f_pwEP[0] f_pwER[0] f_eP[0] f_qr[0] f_qj[0] 
+dump        dmpvtk all custom/vtk ${nDump} ${dir}/post/dump_liggghts_init*.vtk id type x y z radius mass &
+            f_Temp[0] f_heatFlux[0] f_heatSource[0]
 
-run         200000 upto
-write_restart   post/restart/liggghts.restart
+run         ${nSteps} upto
+write_restart   ${dir}/post/restart/liggghts.restart
