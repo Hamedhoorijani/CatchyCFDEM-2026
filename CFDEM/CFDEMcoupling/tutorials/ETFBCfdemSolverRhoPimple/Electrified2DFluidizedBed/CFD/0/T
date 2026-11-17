@@ -1,0 +1,99 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  5                                     |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      T;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 0 0 1 0 0 0];
+
+internalField   uniform 298;
+
+boundaryField
+{
+    inlet
+    {
+        type             fixedValue;
+        value            uniform 298;
+    }
+    outlet
+    {
+       type             zeroGradient;
+    }
+    walls
+    {
+        type            codedFixedValue;
+        value           uniform 298;
+        name            patil;   // name of generated BC
+        code
+        #{         
+            scalar Ta = 298.;
+            scalar hw = 350.;
+
+            const volScalarField& kappa = internalField().mesh().lookupObject<volScalarField>("thCond");
+            const scalarField kappaw(kappa.boundaryField()[patch().index()].patchInternalField());
+            const scalarField kappaDeltaCoeffs(kappaw*patch().deltaCoeffs()/2.0);
+            scalarField w(2.0*hw/(hw + 2.0*kappaDeltaCoeffs));
+
+            scalarField T0 = w*Ta + (1.-w)*patchInternalField();
+            operator==((T0+patchInternalField())/2.0);
+        #};
+    }
+    electrode_center
+    {
+       type             zeroGradient;
+    }    
+    electrode_sidewall
+    {
+       type             zeroGradient;
+    }    
+    back
+    {
+        type            codedFixedValue;
+        value           uniform 298;
+        name            patil;   // name of generated BC
+        code
+        #{         
+            scalar Ta = 298.;
+            scalar hw = 350.;
+
+            const volScalarField& kappa = internalField().mesh().lookupObject<volScalarField>("thCond");
+            const scalarField kappaw(kappa.boundaryField()[patch().index()].patchInternalField());
+            const scalarField kappaDeltaCoeffs(kappaw*patch().deltaCoeffs()/2.0);
+            scalarField w(2.0*hw/(hw + 2.0*kappaDeltaCoeffs));
+
+            scalarField T0 = w*Ta + (1.-w)*patchInternalField();
+            operator==((T0+patchInternalField())/2.0);
+        #};
+    }
+    front
+    {
+        type            codedFixedValue;
+        value           uniform 298;
+        name            patil;   // name of generated BC
+        code
+        #{         
+            scalar Ta = 298.;
+            scalar hw = 350.;
+
+            const volScalarField& kappa = internalField().mesh().lookupObject<volScalarField>("thCond");
+            const scalarField kappaw(kappa.boundaryField()[patch().index()].patchInternalField());
+            const scalarField kappaDeltaCoeffs(kappaw*patch().deltaCoeffs()/2.0);
+            scalarField w(2.0*hw/(hw + 2.0*kappaDeltaCoeffs));
+
+            scalarField T0 = w*Ta + (1.-w)*patchInternalField();
+            operator==((T0+patchInternalField())/2.0);
+        #};
+    }
+}
+
+// ************************************************************************* //

@@ -1,0 +1,155 @@
+# Pseudo-2D e-Bed, graphite granules - DEM init (Table S4)
+# atom types: 1 conductive particle, 2 non-conductive particle,
+#             3 conductive wall (electrode), 4 non-conductive wall (quartz glass)
+#####################################################################################
+
+# particles
+variable dP        equal 175e-6         # diameter [m]
+variable rP        equal ${dP}/2
+variable rhoP      equal 2060           # [kg/m3]
+variable cg        equal 2
+
+# restitution
+variable ePP       equal 0.6
+variable ePW       equal 0.6
+variable eWW       equal 0.5
+
+# friction
+variable muPP      equal 0.2
+variable muPW      equal 0.3
+variable muWW      equal 0.3
+
+# elastic
+variable nu        equal 0.27
+variable YP        equal 1.0e7          # [Pa]
+variable YW        equal 1.0e7          # [Pa]
+variable YoP       equal 1.0e10         # [Pa]
+variable YoW       equal 1.0e10         # [Pa]
+variable aSpot     equal 0.006          # contact-area correction factor
+
+# thermal
+variable kP        equal 168.0          # [W/m/K]
+variable kW3       equal 168.0          # [W/m/K]
+variable kW4       equal 1.38           # [W/m/K]
+variable cpP       equal 1000.0         # [J/kg/K]
+variable cpW3      equal 1000.0         # [J/kg/K]
+variable cpW4      equal 749.0          # [J/kg/K]
+variable emP       equal 0.7
+variable emW3      equal 0.7
+variable emW4      equal 0.93
+variable T0        equal 298            # [K]
+
+# electrical
+variable ECP       equal 5.0e4          # [S/m]
+variable ECW       equal 5.0e6          # [S/m]
+variable ECW2      equal 1.0e-10        # [S/m]
+variable epsRelP   equal 12.5
+variable epsRelG   equal 1.00054
+variable Vapp      equal 60.0           # [V], 10-80
+variable Vgnd      equal 0.0            # [V]
+
+# domain / numerics
+variable xlo       equal -0.04
+variable xhi       equal  0.04
+variable ylo       equal  0.0
+variable yhi       equal  0.01
+variable zlo       equal  0.0
+variable zhi       equal  0.19
+variable skin      equal 0.001          # [m]
+variable dt        equal 2.0e-6         # [s]
+variable g         equal 9.81           # [m/s2]
+variable nRun      equal 175000         # 0.35 s
+variable nThermo   equal 5000
+variable nDump     equal 5000
+
+# insertion
+variable massIns   equal 0.02           # [kg]
+variable massRate  equal 0.25           # [kg/s]
+variable insEvery  equal 1000
+variable vIns      equal -1.0           # [m/s]
+
+
+echo            both
+log             ../DEM/log.liggghts_init
+thermo_log      ../DEM/post/thermo_init.txt
+
+atom_style      granular
+atom_modify     map array
+communicate     single vel yes
+coarsegraining  ${cg}
+
+boundary        m m m
+newton          off
+
+units           si
+processors      * * *
+
+region          reg block ${xlo} ${xhi} ${ylo} ${yhi} ${zlo} ${zhi} units box
+create_box      4 reg
+
+neighbor        ${skin} bin
+neigh_modify    delay 0
+
+fix         m1 all property/global youngsModulus peratomtype ${YP} ${YP} ${YW} ${YW}
+fix         m2 all property/global poissonsRatio peratomtype ${nu} ${nu} ${nu} ${nu}
+fix         m3 all property/global coefficientRestitution peratomtypepair 4 &
+            ${ePP} ${ePP} ${ePW} ${ePW} &
+            ${ePP} ${ePP} ${ePW} ${ePW} &
+            ${ePW} ${ePW} ${eWW} ${eWW} &
+            ${ePW} ${ePW} ${eWW} ${eWW}
+fix         m4 all property/global coefficientFriction peratomtypepair 4 &
+            ${muPP} ${muPP} ${muPW} ${muPW} &
+            ${muPP} ${muPP} ${muPW} ${muPW} &
+            ${muPW} ${muPW} ${muWW} ${muWW} &
+            ${muPW} ${muPW} ${muWW} ${muWW}
+fix         m5 all property/global youngsModulusOriginal peratomtype ${YoP} ${YoP} ${YoW} ${YoW}
+fix         m6 all property/global electricalConductivity peratomtype ${ECP} ${ECP} ${ECW} ${ECW2}
+fix         m7 all property/global epsilonP scalar ${epsRelP}
+fix         m8 all property/global epsilonG scalar ${epsRelG}
+fix         m9 all property/global thermalEmissivity peratomtype ${emP} ${emP} ${emW3} ${emW4}
+fix         m11 all property/global electricalAspotFraction peratomtype ${aSpot} ${aSpot} ${aSpot} ${aSpot}
+
+fix         eP      all property/atom eP        scalar yes yes no 0.0
+fix         qj      all property/atom jouleHeat scalar yes yes no 0.0
+fix         cMatrix all property/atom cMatrix   scalar yes yes no 0.0
+fix         pwEP    all property/atom pwEP      scalar yes yes no 0.0
+fix         pwER    all property/atom pwER      scalar yes yes no 0.0
+
+pair_style  gran model hertz tangential history
+pair_coeff  * *
+
+timestep    ${dt}
+fix         gravi all gravity ${g} vector 0.0 0.0 -1.0
+
+fix     cad0   all mesh/surface file meshes/reactor2D.stl       type 4 scale 1 temperature ${T0}
+fix     cad1   all mesh/surface file meshes/centerElectrode.stl type 3 scale 1 temperature ${T0} electricPotential ${Vapp}
+fix     cad2   all mesh/surface file meshes/sideElectrodes.stl  type 3 scale 1 temperature ${T0} electricPotential ${Vgnd}
+fix     inface all mesh/surface file meshes/insertPlate.stl     type 4 scale 1 temperature ${T0}
+
+fix     geometry all wall/gran model hertz tangential history mesh n_meshes 3 meshes cad0 cad1 cad2
+
+fix     ftco all property/global thermalConductivity peratomtype ${kP}  ${kP}  ${kW3}  ${kW4}
+fix     ftca all property/global thermalCapacity     peratomtype ${cpP} ${cpP} ${cpW3} ${cpW4}
+fix     heattransfer all heat/gran/conduction initial_temperature ${T0}
+
+fix     pts1 all particletemplate/sphere 15485863 atom_type 1 density constant ${rhoP} radius constant ${rP}
+fix     pts2 all particletemplate/sphere 32452867 atom_type 2 density constant ${rhoP} radius constant ${rP}
+fix     pdd1 all particledistribution/discrete 15485867 2 pts1 1.0 pts2 0.0
+
+fix     ins all insert/stream seed 49979687 distributiontemplate pdd1 mass ${massIns} massrate ${massRate} &
+        insert_every ${insEvery} overlapcheck yes all_in no vel constant 0.0 0.0 ${vIns} insertion_face inface
+
+fix     integr all nve/sphere
+
+compute         rke all erotate/sphere
+thermo_style    custom step atoms ke c_rke vol
+thermo          ${nThermo}
+thermo_modify   lost ignore norm no
+compute_modify  thermo_temp dynamic yes
+
+run             1
+dump            dmpvtk all custom/vtk ${nDump} post/dump_liggghts_init*.vtk id x y z radius mass &
+                f_Temp[0] f_heatSource[0] f_cMatrix[0] f_qj[0] f_pwEP[0] f_pwER[0]
+
+run             ${nRun} upto
+write_restart   post/restart/liggghts.restart
