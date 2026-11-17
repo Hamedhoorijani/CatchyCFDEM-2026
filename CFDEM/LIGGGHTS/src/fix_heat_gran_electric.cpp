@@ -41,44 +41,30 @@
 ------------------------------------------------------------------------- */
 
 #include "fix_heat_gran_electric.h"
-#include "domain.h"
-#include "comm.h"
-
 #include "atom.h"
+#include "comm.h"
 #include "compute_pair_gran_local.h"
+#include "error.h"
 #include "fix_property_atom.h"
 #include "fix_property_global.h"
 #include "force.h"
-#include "math_extra.h"
 #include "math_const.h"
-#include "properties.h"
+#include "math_extra.h"
 #include "modify.h"
 #include "neigh_list.h"
-#include "pair_gran.h"
-#include <cmath>
-#include <algorithm>
-#include <iostream>
-#include <vector>
-#include <iomanip>
-#include "update.h"
-#include <thread>
-#include <fstream>
-#include <cstdlib>
-#include "memory.h"
-#include "mpi.h"
-#include <queue>
-#include "random_mars.h"
 #include "neighbor.h"
-#include <cassert>
-#include <ctime>
-#include <omp.h>
-#include <utility>
-
-#include <unordered_map>
-#include <unordered_set>
-#include <numeric>
-
+#include "pair_gran.h"
+#include "properties.h"
+#include "random_mars.h"
+#include "update.h"
+#include "mpi.h"
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <cstring>
 #include <limits>
+#include <string>
+#include <vector>
 
 using namespace LAMMPS_NS;
 using namespace FixConst;
@@ -86,87 +72,71 @@ using namespace FixConst;
 using MathConst::MY_4PI;
 using namespace MathExtra;
 
-const double SMALL = 1.0E-30;
-
 enum{ CONDUCTION_CONTACT_AREA_OVERLAP,
       CONDUCTION_CONTACT_AREA_CONSTANT,
       CONDUCTION_CONTACT_AREA_PROJECTION};
 
-FixHeatGranElectric::FixHeatGranElectric(class LAMMPS *lmp, int narg, char **arg) :
-  FixHeatGran(lmp, narg, arg),
-  fix_eConductivity_(0),
-  eConductivity_(0),
-  store_contact_data_(false),
-  fix_conduction_contact_area_(0),
-  fix_n_conduction_contacts_(0),
-  fix_wall_heattransfer_coeff_(0),
-  fix_wall_temperature_(0),
-  conduction_contact_area_(0),
-  n_conduction_contacts_(0),
-  wall_heattransfer_coeff_(0),
-  wall_temp_(0),
-  fix_wall_electricPotential_(0),
-  wall_ep_(0),
-  fix_eP(nullptr),
-  fix_eP_old(nullptr),
-  fix_tot_I(nullptr),
-  eP(0),
-  eP_old(0),
-  tot_I(0),
-  fix_total_C(nullptr),
-  fix_countCheck(nullptr),
-  eP0(0),
-  eP_needs_init_(false),
-  qj(0),
-  qr(0),
-  hasEPArgs(true),
-  electricMode_(false),
-  area_calculation_mode_(CONDUCTION_CONTACT_AREA_OVERLAP),
-  fixed_contact_area_(0.),
-  area_correction_flag_(0),
-  joule_heat_startTime(0),
-  temp_control_flag_(false),
-  temp_control_(0),
-  aspot_fraction_global_(1.0),
-  fix_aspotFrac_(nullptr),
-  aspotFrac_(nullptr),
-  Cmin_branch_(0.0),
-  sigma0_(nullptr),
-  alpha_(nullptr),
-  Tref_(293.15),
-  sigma_floor_(1e-12),
-  TB(0),
-  Sigma(5.670373E-8),
-  electric_log_stride_(1),
-  cutGhost(0.10),
-  cutGhostsq(0.01),
-  radiation_flag_(false),
-  compID(nullptr),
-  deltan_ratio_(0)
+static void zero_with_ghosts(FixPropertyAtom *f, int nall)
 {
+  if (!f || !f->vector_atom) return;
+  double *v = f->vector_atom;
+  for (int i = 0; i < nall; ++i) v[i] = 0.0;
+}
+
+static FixPropertyAtom *find_or_add_property(Modify *modify, const char *caller, const char *name,
+                                             bool isVector, int len1, bool restartAndReverse, bool create)
+{
+  const char *kind = isVector ? "vector" : "scalar";
+  FixPropertyAtom *fix = static_cast<FixPropertyAtom*>(modify->find_fix_property(name,"property/atom",kind,len1,0,caller,false));
+  if (fix || !create) return fix;
+
+  const char *flag = restartAndReverse ? "yes" : "no";
+  const char *fixarg[11];
+  fixarg[0] = name;
+  fixarg[1] = "all";
+  fixarg[2] = "property/atom";
+  fixarg[3] = name;
+  fixarg[4] = kind;
+  fixarg[5] = flag;
+  fixarg[6] = "yes";
+  fixarg[7] = flag;
+  fixarg[8] = "0.";
+  int nfixarg = 9;
+  if (isVector) {
+    fixarg[9]  = "0.";
+    fixarg[10] = "0.";
+    nfixarg = 11;
+  }
+  return modify->add_fix_property_atom(nfixarg,const_cast<char**>(fixarg),caller);
+}
+
+FixHeatGranElectric::FixHeatGranElectric(class LAMMPS *lmp, int narg, char **arg) :
+  FixHeatGran(lmp, narg, arg)
+{
+  elec_contact_factor_   = 1.0;
+  elec_min_overlap_frac_ = 0.0;
+  elec_min_overlap_set_  = false;
+
   iarg_ = 5;
   bool hasargs = true;
   if(strcmp(style,"heat/gran/electric") == 0) electricMode_ = true;
-  int rank;
-  MPI_Comm_rank(world, &rank);
 
   while(iarg_ < narg && hasargs)
   {
     hasargs = false;
     if(strcmp(arg[iarg_],"contact_area") == 0) {
-
       if(strcmp(arg[iarg_+1],"overlap") == 0)
-        area_calculation_mode_ =  CONDUCTION_CONTACT_AREA_OVERLAP;
+        area_calculation_mode_ = CONDUCTION_CONTACT_AREA_OVERLAP;
       else if(strcmp(arg[iarg_+1],"projection") == 0)
-        area_calculation_mode_ =  CONDUCTION_CONTACT_AREA_PROJECTION;
+        area_calculation_mode_ = CONDUCTION_CONTACT_AREA_PROJECTION;
       else if(strcmp(arg[iarg_+1],"constant") == 0)
       {
         if (iarg_+3 > narg)
-            error->fix_error(FLERR,this,"not enough arguments for keyword 'contact_area constant'");
-        area_calculation_mode_ =  CONDUCTION_CONTACT_AREA_CONSTANT;
+          error->fix_error(FLERR,this,"not enough arguments for keyword 'contact_area constant'");
+        area_calculation_mode_ = CONDUCTION_CONTACT_AREA_CONSTANT;
         fixed_contact_area_ = force->numeric(FLERR,arg[iarg_+2]);
         if (fixed_contact_area_ <= 0.)
-            error->fix_error(FLERR,this,"'contact_area constant' value must be > 0");
+          error->fix_error(FLERR,this,"'contact_area constant' value must be > 0");
         iarg_++;
       }
       else error->fix_error(FLERR,this,"expecting 'overlap', 'projection' or 'constant' after 'contact_area'");
@@ -191,9 +161,7 @@ FixHeatGranElectric::FixHeatGranElectric(class LAMMPS *lmp, int narg, char **arg
       iarg_ += 2;
       hasargs = true;
     } else if(strcmp(arg[iarg_],"initial_electricPotential") == 0 && electricMode_) {
-      if (iarg_+1 > narg){
-        error->fix_error(FLERR,this,"not enough arguments for keyword 'initial_electricPotential'");
-      }
+      if (iarg_+2 > narg) error->fix_error(FLERR,this,"not enough arguments for keyword 'initial_electricPotential'");
       eP0 = atof(arg[iarg_+1]);
       iarg_ += 2;
       hasargs = true;
@@ -205,26 +173,40 @@ FixHeatGranElectric::FixHeatGranElectric(class LAMMPS *lmp, int narg, char **arg
       hasargs = true;
     } else if(strcmp(arg[iarg_],"temp_control") == 0 && electricMode_) {
       if (iarg_+2 > narg) error->fix_error(FLERR,this,"not enough arguments for keyword 'temp_control'");
-      if(strcmp(arg[iarg_+1],"yes") == 0){
+      if(strcmp(arg[iarg_+1],"yes") == 0) {
         if (iarg_+3 > narg) error->fix_error(FLERR,this,"not enough arguments for keyword 'temp_control yes'");
         temp_control_flag_ = true;
         temp_control_ = atof(arg[iarg_+2]);
         iarg_ += 3;
-      } else if(strcmp(arg[iarg_+1],"no") == 0){
+      } else if(strcmp(arg[iarg_+1],"no") == 0) {
         temp_control_flag_ = false;
         iarg_ += 2;
       } else error->fix_error(FLERR,this,"expecting 'yes' or 'no' after 'temp_control'");
       hasargs = true;
-    } else if (strcmp(arg[iarg_],"aspot_fraction") == 0) {
+    } else if(strcmp(arg[iarg_],"aspot_fraction") == 0) {
       if (iarg_+2 > narg) error->fix_error(FLERR,this,"aspot_fraction needs a scalar in (0,1]");
       aspot_fraction_global_ = atof(arg[iarg_+1]);
       if (aspot_fraction_global_ <= 0.0 || aspot_fraction_global_ > 1.0)
         error->fix_error(FLERR,this,"aspot_fraction must be in (0,1]");
       iarg_ += 2;
       hasargs = true;
-    } else if (strcmp(arg[iarg_],"Gmin") == 0) {
+    } else if(strcmp(arg[iarg_],"Gmin") == 0) {
       if (iarg_+2 > narg) error->fix_error(FLERR,this,"Gmin needs a scalar >= 0");
       Cmin_branch_ = std::max(0.0, atof(arg[iarg_+1]));
+      iarg_ += 2;
+      hasargs = true;
+    } else if(strcmp(arg[iarg_],"neighbor_dia") == 0) {
+      if (iarg_+2 > narg) error->fix_error(FLERR,this,"neighbor_dia needs a scalar >= 1");
+      elec_contact_factor_ = atof(arg[iarg_+1]);
+      if (elec_contact_factor_ < 1.0) error->fix_error(FLERR,this,"neighbor_dia must be >= 1.0");
+      iarg_ += 2;
+      hasargs = true;
+    } else if(strcmp(arg[iarg_],"min_overlap") == 0) {
+      if (iarg_+2 > narg) error->fix_error(FLERR,this,"min_overlap needs a scalar in [0,1)");
+      elec_min_overlap_frac_ = atof(arg[iarg_+1]);
+      if (elec_min_overlap_frac_ < 0.0 || elec_min_overlap_frac_ >= 1.0)
+        error->fix_error(FLERR,this,"min_overlap must be in [0,1)");
+      elec_min_overlap_set_ = true;
       iarg_ += 2;
       hasargs = true;
     } else if(strcmp(arg[iarg_],"export_every") == 0) {
@@ -236,12 +218,12 @@ FixHeatGranElectric::FixHeatGranElectric(class LAMMPS *lmp, int narg, char **arg
       hasargs = true;
     } else if(strcmp(arg[iarg_],"radiation") == 0 && electricMode_) {
       if (iarg_+2 > narg) error->fix_error(FLERR,this,"not enough arguments for keyword 'radiation'");
-      if(strcmp(arg[iarg_+1],"yes") == 0){
+      if(strcmp(arg[iarg_+1],"yes") == 0) {
         if (iarg_+3 > narg) error->fix_error(FLERR,this,"not enough arguments for keyword 'radiation yes'");
         radiation_flag_ = true;
         TB = atof(arg[iarg_+2]);
         iarg_ += 3;
-      } else if(strcmp(arg[iarg_+1],"no") == 0){
+      } else if(strcmp(arg[iarg_+1],"no") == 0) {
         radiation_flag_ = false;
         iarg_ += 2;
       } else error->fix_error(FLERR,this,"expecting 'yes' or 'no' after 'radiation'");
@@ -252,8 +234,8 @@ FixHeatGranElectric::FixHeatGranElectric(class LAMMPS *lmp, int narg, char **arg
   if(CONDUCTION_CONTACT_AREA_OVERLAP != area_calculation_mode_ && 1 == area_correction_flag_)
     error->fix_error(FLERR,this,"can use 'area_correction' only for 'contact_area = overlap'");
 
-  std::string seed_full = std::to_string(86028157);
-  RGen = new RanMars(lmp, seed_full.c_str());
+  std::string seed = std::to_string(86028157 + comm->me);
+  RGen = new RanMars(lmp, seed.c_str());
 
   raypoint = new double[3];
 }
@@ -261,313 +243,49 @@ FixHeatGranElectric::FixHeatGranElectric(class LAMMPS *lmp, int narg, char **arg
 FixHeatGranElectric::~FixHeatGranElectric()
 {
   if (eConductivity_) delete [] eConductivity_;
-  if (raypoint) delete [] raypoint;
-  if (stencilLength) delete [] stencilLength;
-  if (binStencildx) delete [] binStencildx;
+  if (raypoint)       delete [] raypoint;
+  if (stencilLength)  delete [] stencilLength;
+  if (binStencildx)   delete [] binStencildx;
+  if (binStencilmdx)  delete [] binStencilmdx;
+  if (binStencildy)   delete [] binStencildy;
+  if (binStencilmdy)  delete [] binStencilmdy;
+  if (binStencildz)   delete [] binStencildz;
+  if (binStencilmdz)  delete [] binStencilmdz;
+  if (RGen)           delete RGen;
 }
 
 void FixHeatGranElectric::post_create()
 {
   FixHeatGran::post_create();
 
-  fix_conduction_contact_area_ = static_cast<FixPropertyAtom*>(modify->find_fix_property("contactAreaConduction","property/atom","scalar",0,0,this->style,false));
-  if(!fix_conduction_contact_area_ && store_contact_data_)
-  {
-    const char* fixarg[10];
-    fixarg[0]="contactAreaConduction";
-    fixarg[1]="all";
-    fixarg[2]="property/atom";
-    fixarg[3]="contactAreaConduction";
-    fixarg[4]="scalar";
-    fixarg[5]="no";
-    fixarg[6]="yes";
-    fixarg[7]="no";
-    fixarg[8]="0.";
-    fix_conduction_contact_area_ = modify->add_fix_property_atom(9,const_cast<char**>(fixarg),style);
-  }
+  fix_conduction_contact_area_ = find_or_add_property(modify,style,"contactAreaConduction",false,0,false,store_contact_data_);
+  fix_n_conduction_contacts_   = find_or_add_property(modify,style,"nContactsConduction",  false,0,false,store_contact_data_);
+  fix_wall_heattransfer_coeff_ = find_or_add_property(modify,style,"wallHeattransferCoeff",false,0,false,store_contact_data_);
+  fix_wall_temperature_        = find_or_add_property(modify,style,"wallTemp",             false,0,false,store_contact_data_);
 
-  fix_n_conduction_contacts_ = static_cast<FixPropertyAtom*>(modify->find_fix_property("nContactsConduction","property/atom","scalar",0,0,this->style,false));
-  if(!fix_n_conduction_contacts_ && store_contact_data_)
-  {
-    const char* fixarg[10];
-    fixarg[0]="nContactsConduction";
-    fixarg[1]="all";
-    fixarg[2]="property/atom";
-    fixarg[3]="nContactsConduction";
-    fixarg[4]="scalar";
-    fixarg[5]="no";
-    fixarg[6]="yes";
-    fixarg[7]="no";
-    fixarg[8]="0.";
-    fix_n_conduction_contacts_ = modify->add_fix_property_atom(9,const_cast<char**>(fixarg),style);
-  }
+  fix_qj      = find_or_add_property(modify,style,"qj",     false,0,true,true);
+  fix_qj_pp   = find_or_add_property(modify,style,"qj_pp",  false,0,true,true);
+  fix_qj_pw   = find_or_add_property(modify,style,"qj_pw",  false,0,true,true);
+  fix_qr      = find_or_add_property(modify,style,"qr",     false,0,true,true);
+  fix_tot_I   = find_or_add_property(modify,style,"tot_I",  false,0,true,true);
+  fix_current = find_or_add_property(modify,style,"current",true, 0,true,true);
 
-  fix_qj = static_cast<FixPropertyAtom*>(modify->find_fix_property("qj","property/atom","scalar",0,0,this->style,false));
-  if(!fix_qj)
-  {
-    const char* fixarg[10];
-    fixarg[0]="qj";
-    fixarg[1]="all";
-    fixarg[2]="property/atom";
-    fixarg[3]="qj";
-    fixarg[4]="scalar";
-    fixarg[5]="yes";
-    fixarg[6]="yes";
-    fixarg[7]="yes";
-    fixarg[8]="0.";
-    fix_qj = modify->add_fix_property_atom(9,const_cast<char**>(fixarg),style);
-  }
+  fix_eP = find_or_add_property(modify,style,"eP",false,1,true,false);
+  eP_needs_init_ = (fix_eP == NULL);
+  if (!fix_eP) fix_eP = find_or_add_property(modify,style,"eP",false,1,true,true);
 
-  fix_tot_I = static_cast<FixPropertyAtom*>(modify->find_fix_property("tot_I","property/atom","scalar",0,0,this->style,false));
-  if(!fix_tot_I)
-  {
-    const char* fixarg[10];
-    fixarg[0]="tot_I";
-    fixarg[1]="all";
-    fixarg[2]="property/atom";
-    fixarg[3]="tot_I";
-    fixarg[4]="scalar";
-    fixarg[5]="yes";
-    fixarg[6]="yes";
-    fixarg[7]="yes";
-    fixarg[8]="0.";
-    fix_tot_I = modify->add_fix_property_atom(9,const_cast<char**>(fixarg),style);
-  }
+  fix_eP_old = find_or_add_property(modify,style,"eP_old",false,1,true,true);
+  fix_deltaE = find_or_add_property(modify,style,"deltaE",false,1,true,true);
 
-  fix_qj_pp = static_cast<FixPropertyAtom*>(modify->find_fix_property("qj_pp","property/atom","scalar",0,0,this->style,false));
-  if(!fix_qj_pp)
-  {
-    const char* fixarg[10];
-    fixarg[0]="qj_pp";
-    fixarg[1]="all";
-    fixarg[2]="property/atom";
-    fixarg[3]="qj_pp";
-    fixarg[4]="scalar";
-    fixarg[5]="yes";
-    fixarg[6]="yes";
-    fixarg[7]="yes";
-    fixarg[8]="0.";
-    fix_qj_pp = modify->add_fix_property_atom(9,const_cast<char**>(fixarg),style);
-  }
-
-  fix_qj_pw = static_cast<FixPropertyAtom*>(modify->find_fix_property("qj_pw","property/atom","scalar",0,0,this->style,false));
-  if(!fix_qj_pw)
-  {
-    const char* fixarg[10];
-    fixarg[0]="qj_pw";
-    fixarg[1]="all";
-    fixarg[2]="property/atom";
-    fixarg[3]="qj_pw";
-    fixarg[4]="scalar";
-    fixarg[5]="yes";
-    fixarg[6]="yes";
-    fixarg[7]="yes";
-    fixarg[8]="0.";
-    fix_qj_pw = modify->add_fix_property_atom(9,const_cast<char**>(fixarg),style);
-  }
-
-  fix_qr = static_cast<FixPropertyAtom*>(modify->find_fix_property("qr","property/atom","scalar",0,0,this->style,false));
-  if(!fix_qr)
-  {
-    const char* fixarg[10];
-    fixarg[0]="qr";
-    fixarg[1]="all";
-    fixarg[2]="property/atom";
-    fixarg[3]="qr";
-    fixarg[4]="scalar";
-    fixarg[5]="yes";
-    fixarg[6]="yes";
-    fixarg[7]="yes";
-    fixarg[8]="0.";
-    fix_qr = modify->add_fix_property_atom(9,const_cast<char**>(fixarg),style);
-  }
-
-  fix_wall_heattransfer_coeff_ = static_cast<FixPropertyAtom*>(modify->find_fix_property("wallHeattransferCoeff","property/atom","scalar",0,0,this->style,false));
-  if(!fix_wall_heattransfer_coeff_ && store_contact_data_)
-  {
-    const char* fixarg[10];
-    fixarg[0]="wallHeattransferCoeff";
-    fixarg[1]="all";
-    fixarg[2]="property/atom";
-    fixarg[3]="wallHeattransferCoeff";
-    fixarg[4]="scalar";
-    fixarg[5]="no";
-    fixarg[6]="yes";
-    fixarg[7]="no";
-    fixarg[8]="0.";
-    fix_wall_heattransfer_coeff_ = modify->add_fix_property_atom(9,const_cast<char**>(fixarg),style);
-  }
-
-  fix_wall_temperature_ = static_cast<FixPropertyAtom*>(modify->find_fix_property("wallTemp","property/atom","scalar",0,0,this->style,false));
-  if(!fix_wall_temperature_ && store_contact_data_)
-  {
-    const char* fixarg[10];
-    fixarg[0]="wallTemp";
-    fixarg[1]="all";
-    fixarg[2]="property/atom";
-    fixarg[3]="wallTemp";
-    fixarg[4]="scalar";
-    fixarg[5]="no";
-    fixarg[6]="yes";
-    fixarg[7]="no";
-    fixarg[8]="0.";
-    fix_wall_temperature_ = modify->add_fix_property_atom(9,const_cast<char**>(fixarg),style);
-  }
-
-  fix_eP = static_cast<FixPropertyAtom*>(modify->find_fix_property("eP","property/atom","scalar",1,0,this->style,false));
-  if(!fix_eP)
-  {
-    const char* fixarg[11];
-    fixarg[0]="eP";
-    fixarg[1]="all";
-    fixarg[2]="property/atom";
-    fixarg[3]="eP";
-    fixarg[4]="scalar";
-    fixarg[5]="yes";
-    fixarg[6]="yes";
-    fixarg[7]="yes";
-    fixarg[8]="0.";
-    fix_eP = modify->add_fix_property_atom(9,const_cast<char**>(fixarg),style);
-    eP_needs_init_ = true;
-  }
-  else
-  {
-    eP_needs_init_ = false;
-  }
-
-  fix_deltaE = static_cast<FixPropertyAtom*>(modify->find_fix_property("deltaE","property/atom","scalar",1,0,this->style,false));
-  if(!fix_deltaE)
-  {
-    const char* fixarg[11];
-    fixarg[0]="deltaE";
-    fixarg[1]="all";
-    fixarg[2]="property/atom";
-    fixarg[3]="deltaE";
-    fixarg[4]="scalar";
-    fixarg[5]="yes";
-    fixarg[6]="yes";
-    fixarg[7]="yes";
-    fixarg[8]="0.";
-    fix_deltaE = modify->add_fix_property_atom(9,const_cast<char**>(fixarg),style);
-  }
-
-  fix_eP_old = static_cast<FixPropertyAtom*>(modify->find_fix_property("eP_old","property/atom","scalar",1,0,this->style,false));
-  if(!fix_eP_old)
-  {
-    const char* fixarg[11];
-    fixarg[0]="eP_old";
-    fixarg[1]="all";
-    fixarg[2]="property/atom";
-    fixarg[3]="eP_old";
-    fixarg[4]="scalar";
-    fixarg[5]="yes";
-    fixarg[6]="yes";
-    fixarg[7]="yes";
-    fixarg[8]="0.";
-    fix_eP_old = modify->add_fix_property_atom(9,const_cast<char**>(fixarg),style);
-  }
-
-  fix_current = static_cast<FixPropertyAtom*>(modify->find_fix_property("current","property/atom","vector",0,0,this->style,false));
-  if(!fix_current)
-  {
-    const char* fixarg[11];
-    fixarg[0]="current";
-    fixarg[1]="all";
-    fixarg[2]="property/atom";
-    fixarg[3]="current";
-    fixarg[4]="vector";
-    fixarg[5]="yes";
-    fixarg[6]="yes";
-    fixarg[7]="yes";
-    fixarg[8]="0.";
-    fixarg[9]="0.";
-    fixarg[10]="0.";
-    fix_current = modify->add_fix_property_atom(11,const_cast<char**>(fixarg),style);
-  }
-
-  fix_compID = static_cast<FixPropertyAtom*>(modify->find_fix_property("compID","property/atom","scalar",0,0,this->style,false));
-  if(!fix_compID)
-  {
-    const char* fixarg[10];
-    fixarg[0]="compID";
-    fixarg[1]="all";
-    fixarg[2]="property/atom";
-    fixarg[3]="compID";
-    fixarg[4]="scalar";
-    fixarg[5]="yes";
-    fixarg[6]="yes";
-    fixarg[7]="yes";
-    fixarg[8]="0.";
-    fix_compID = modify->add_fix_property_atom(9,const_cast<char**>(fixarg),style);
-  }
-
-  fix_rhsG = static_cast<FixPropertyAtom*>(modify->find_fix_property("rhsG","property/atom","scalar",0,0,this->style,false));
-  if(!fix_rhsG)
-  {
-    const char* fixarg[10];
-    fixarg[0]="rhsG";
-    fixarg[1]="all";
-    fixarg[2]="property/atom";
-    fixarg[3]="rhsG";
-    fixarg[4]="scalar";
-    fixarg[5]="yes";
-    fixarg[6]="yes";
-    fixarg[7]="yes";
-    fixarg[8]="0.";
-    fix_rhsG = modify->add_fix_property_atom(9,const_cast<char**>(fixarg),style);
-  }
-
-  fix_diagFlag = static_cast<FixPropertyAtom*>(modify->find_fix_property("diagFlag","property/atom","scalar",0,0,this->style,false));
-  if(!fix_diagFlag)
-  {
-    const char* fixarg[10];
-    fixarg[0]="diagFlag";
-    fixarg[1]="all";
-    fixarg[2]="property/atom";
-    fixarg[3]="diagFlag";
-    fixarg[4]="scalar";
-    fixarg[5]="yes";
-    fixarg[6]="yes";
-    fixarg[7]="yes";
-    fixarg[8]="0.";
-    fix_diagFlag = modify->add_fix_property_atom(9,const_cast<char**>(fixarg),style);
-  }
-
-  fix_total_C = static_cast<FixPropertyAtom*>(modify->find_fix_property("total_C","property/atom","scalar",0,0,this->style,false));
-  if(!fix_total_C)
-  {
-    const char* fixarg[10];
-    fixarg[0]="total_C";
-    fixarg[1]="all";
-    fixarg[2]="property/atom";
-    fixarg[3]="total_C";
-    fixarg[4]="scalar";
-    fixarg[5]="yes";
-    fixarg[6]="yes";
-    fixarg[7]="yes";
-    fixarg[8]="0.";
-    fix_total_C = modify->add_fix_property_atom(9,const_cast<char**>(fixarg),style);
-  }
-
-  fix_countCheck = static_cast<FixPropertyAtom*>(modify->find_fix_property("countCheck","property/atom","scalar",0,0,this->style,false));
-  if(!fix_countCheck)
-  {
-    const char* fixarg[10];
-    fixarg[0]="countCheck";
-    fixarg[1]="all";
-    fixarg[2]="property/atom";
-    fixarg[3]="countCheck";
-    fixarg[4]="scalar";
-    fixarg[5]="yes";
-    fixarg[6]="yes";
-    fixarg[7]="yes";
-    fixarg[8]="0.";
-    fix_countCheck = modify->add_fix_property_atom(9,const_cast<char**>(fixarg),style);
-  }
+  fix_compID     = find_or_add_property(modify,style,"compID",    false,0,true,true);
+  fix_rhsG       = find_or_add_property(modify,style,"rhsG",      false,0,true,true);
+  fix_diagFlag   = find_or_add_property(modify,style,"diagFlag",  false,0,true,true);
+  fix_total_C    = find_or_add_property(modify,style,"total_C",   false,0,true,true);
+  fix_countCheck = find_or_add_property(modify,style,"countCheck",false,0,true,true);
 
   if(store_contact_data_ && (!fix_conduction_contact_area_ || !fix_n_conduction_contacts_ ||
                              !fix_wall_heattransfer_coeff_ || !fix_eP || !fix_eP_old ||
-                             !fix_wall_temperature_ || !fix_wall_electricPotential_))
+                             !fix_wall_temperature_))
     error->one(FLERR,"internal error");
 }
 
@@ -597,7 +315,8 @@ void FixHeatGranElectric::updatePtrs()
     n_conduction_contacts_ = fix_n_conduction_contacts_->vector_atom;
     wall_heattransfer_coeff_ = fix_wall_heattransfer_coeff_->vector_atom;
     wall_temp_ = fix_wall_temperature_->vector_atom;
-    if(electricMode_) wall_ep_ = fix_wall_electricPotential_->vector_atom;
+    if(electricMode_ && fix_wall_electricPotential_)
+      wall_ep_ = fix_wall_electricPotential_->vector_atom;
   }
 }
 
@@ -613,77 +332,91 @@ void FixHeatGranElectric::init()
   fix_eConductivity_ =
     static_cast<FixPropertyGlobal*>(modify->find_fix_property("thermalConductivity","property/global","peratomtype",max_type,0,style));
 
-  if(electricMode_){
-    e_cond = static_cast<FixPropertyGlobal*>(modify->find_fix_property("electricalConductivity","property/global","peratomtype",max_type,0,style))->get_values();
-    fix_eP = static_cast<FixPropertyAtom*>(modify->find_fix_property("eP","property/atom","scalar",1,0,style));
-    fix_eP_old = static_cast<FixPropertyAtom*>(modify->find_fix_property("eP_old","property/atom","scalar",1,0,style));
-    fix_qj = static_cast<FixPropertyAtom*>(modify->find_fix_property("qj","property/atom","scalar",1,0,style));
-    fix_qr = static_cast<FixPropertyAtom*>(modify->find_fix_property("qr","property/atom","scalar",1,0,style));
-    fix_cMatrix = static_cast<FixPropertyAtom*>(modify->find_fix_property("cMatrix","property/atom","scalar",1,0,style));
-    fix_pwER = static_cast<FixPropertyAtom*>(modify->find_fix_property("pwER","property/atom","scalar",1,0,style));
-    fix_pwEP = static_cast<FixPropertyAtom*>(modify->find_fix_property("pwEP","property/atom","scalar",1,0,style));
+  if(electricMode_)
+  {
+    FixPropertyGlobal *fix_econd = static_cast<FixPropertyGlobal*>(modify->find_fix_property("electricalConductivity","property/global","peratomtype",max_type,0,style,false));
+    e_cond = fix_econd ? fix_econd->get_values() : NULL;
 
-    fix_current = static_cast<FixPropertyAtom*>(modify->find_fix_property("current","property/atom","vector",1,0,style));
-    fix_compID = static_cast<FixPropertyAtom*>(modify->find_fix_property("compID","property/atom","scalar",1,0,style));
-    fix_rhsG = static_cast<FixPropertyAtom*>(modify->find_fix_property("rhsG","property/atom","scalar",1,0,style));
+    fix_eP       = static_cast<FixPropertyAtom*>(modify->find_fix_property("eP","property/atom","scalar",1,0,style));
+    fix_eP_old   = static_cast<FixPropertyAtom*>(modify->find_fix_property("eP_old","property/atom","scalar",1,0,style));
+    fix_qj       = static_cast<FixPropertyAtom*>(modify->find_fix_property("qj","property/atom","scalar",1,0,style));
+    fix_qr       = static_cast<FixPropertyAtom*>(modify->find_fix_property("qr","property/atom","scalar",1,0,style));
+    fix_cMatrix  = static_cast<FixPropertyAtom*>(modify->find_fix_property("cMatrix","property/atom","scalar",1,0,style));
+    fix_pwER     = static_cast<FixPropertyAtom*>(modify->find_fix_property("pwER","property/atom","scalar",1,0,style));
+    fix_pwEP     = static_cast<FixPropertyAtom*>(modify->find_fix_property("pwEP","property/atom","scalar",1,0,style));
+    fix_current  = static_cast<FixPropertyAtom*>(modify->find_fix_property("current","property/atom","vector",1,0,style));
+    fix_compID   = static_cast<FixPropertyAtom*>(modify->find_fix_property("compID","property/atom","scalar",1,0,style));
+    fix_rhsG     = static_cast<FixPropertyAtom*>(modify->find_fix_property("rhsG","property/atom","scalar",1,0,style));
     fix_diagFlag = static_cast<FixPropertyAtom*>(modify->find_fix_property("diagFlag","property/atom","scalar",1,0,style));
-    fix_total_C = static_cast<FixPropertyAtom*>(modify->find_fix_property("total_C","property/atom","scalar",1,0,style));
+    fix_total_C  = static_cast<FixPropertyAtom*>(modify->find_fix_property("total_C","property/atom","scalar",1,0,style));
     fix_countCheck = static_cast<FixPropertyAtom*>(modify->find_fix_property("countCheck","property/atom","scalar",1,0,style));
 
-    fix_aspotFrac_ = static_cast<FixPropertyGlobal*>(modify->find_fix_property("electricalAspotFraction","property/global","peratomtype",max_type,0,style));
-    aspotFrac_ = fix_aspotFrac_ ? fix_aspotFrac_->get_values() : nullptr;
+    fix_aspotFrac_ = static_cast<FixPropertyGlobal*>(modify->find_fix_property("electricalAspotFraction","property/global","peratomtype",max_type,0,style,false));
+    aspotFrac_ = fix_aspotFrac_ ? fix_aspotFrac_->get_values() : NULL;
 
-    if (auto *fxS0 = static_cast<FixPropertyGlobal*>(modify->find_fix_property("electricalSigma0","property/global","peratomtype",max_type,0,style,false))) {
-      sigma0_ = fxS0->get_values();
-    } else {
-      sigma0_ = e_cond;
-    }
+    FixPropertyGlobal *fix_sigma0 = static_cast<FixPropertyGlobal*>(modify->find_fix_property("electricalSigma0","property/global","peratomtype",max_type,0,style,false));
+    sigma0_ = fix_sigma0 ? fix_sigma0->get_values() : e_cond;
+    if (!sigma0_)
+      error->all(FLERR,"Fix heat/gran/electric needs fix property/global 'electricalSigma0' or 'electricalConductivity' (peratomtype)");
 
-    if (auto *fxAl = static_cast<FixPropertyGlobal*>(modify->find_fix_property("electricalAlpha","property/global","peratomtype",max_type,0,style,false))) {
-      alpha_ = fxAl->get_values();
-    } else {
-      alpha_ = nullptr;
-    }
+    FixPropertyGlobal *fix_alpha = static_cast<FixPropertyGlobal*>(modify->find_fix_property("electricalAlpha","property/global","peratomtype",max_type,0,style,false));
+    alpha_ = fix_alpha ? fix_alpha->get_values() : NULL;
 
-    if (auto *fix_Tref = static_cast<FixPropertyGlobal*>(modify->find_fix_property("electricalTref","property/global","scalar",0,0,style,false))) {
-      Tref_ = fix_Tref->compute_scalar();
-    }
+    FixPropertyGlobal *fix_Tref = static_cast<FixPropertyGlobal*>(modify->find_fix_property("electricalTref","property/global","scalar",0,0,style,false));
+    if (fix_Tref) Tref_ = fix_Tref->compute_scalar();
 
-    if (auto *fix_floor = static_cast<FixPropertyGlobal*>(modify->find_fix_property("electricalSigmaFloor","property/global","scalar",0,0,style,false))) {
-      sigma_floor_ = std::max(0.0, fix_floor->compute_scalar());
-    }
+    FixPropertyGlobal *fix_floor = static_cast<FixPropertyGlobal*>(modify->find_fix_property("electricalSigmaFloor","property/global","scalar",0,0,style,false));
+    if (fix_floor) sigma_floor_ = std::max(0.0, fix_floor->compute_scalar());
 
-    if(radiation_flag_){
+    if(radiation_flag_)
       emissivity_ = static_cast<FixPropertyGlobal*>(modify->find_fix_property("thermalEmissivity","property/global","peratomtype",max_type,0,style))->get_values();
-    }
 
-    wallfix = nullptr;
-    int nfix = modify->nfix;
-    for (int i = 0; i < nfix; i++) {
+    wallfix = NULL;
+    for (int i = 0; i < modify->nfix; i++) {
       if (strcmp(modify->fix[i]->style, "wall/gran") == 0) {
         wallfix = (FixWallGran *)modify->fix[i];
         break;
       }
     }
-    if (wallfix == nullptr) {
-      error->all(FLERR, "FixHeatGranElectric requires fix wall/gran");
-    }
+    if (wallfix == NULL)
+      error->all(FLERR,"FixHeatGranElectric requires fix wall/gran");
     if (force->newton_pair)
-      error->all(FLERR, "FixHeatGranElectric assumes 'newton pair off'");
+      error->all(FLERR,"FixHeatGranElectric assumes 'newton pair off'");
 
     if (eP_needs_init_) {
       fix_eP->set_all(eP0);
       eP_needs_init_ = false;
     }
+
+    if (elec_contact_factor_ > 1.0 && !elec_min_overlap_set_) {
+      elec_min_overlap_frac_ = 1.0e-4;
+      if (comm->me == 0 && screen)
+        fprintf(screen,"[ELECTRIC] neighbor_dia > 1 with no min_overlap: using min_overlap %.3g\n", elec_min_overlap_frac_);
+    }
+
+    double rmax_loc = 0.0;
+    for (int i = 0; i < atom->nlocal; ++i) rmax_loc = std::max(rmax_loc, atom->radius[i]);
+    double rmax_glb = 0.0;
+    MPI_Allreduce(&rmax_loc, &rmax_glb, 1, MPI_DOUBLE, MPI_MAX, world);
+
+    if (rmax_glb > 0.0 && comm->me == 0 && screen) {
+      const double f_max = 1.0 + neighbor->skin / (2.0 * rmax_glb);
+      if (elec_contact_factor_ > f_max)
+        fprintf(screen,"[ELECTRIC] WARNING: neighbor_dia=%.4g is larger than the neighbor list allows "
+                       "(max %.4g for skin=%.4g, r_max=%.4g). Increase the neighbor skin.\n",
+                elec_contact_factor_, f_max, neighbor->skin, rmax_glb);
+      fprintf(screen,"[ELECTRIC] contact model: neighbor_dia=%.4g  min_overlap=%.4g  skin=%.4g  r_max=%.4g\n",
+              elec_contact_factor_, elec_min_overlap_frac_, neighbor->skin, rmax_glb);
+      fflush(screen);
+    }
   }
 
-  for(int i=1;i< max_type+1; i++)
-    for(int j=1;j<max_type+1;j++)
-    {
-      eConductivity_[i-1] = fix_eConductivity_->compute_vector(i-1);
-      if(eConductivity_[i-1] < 0.)
-        error->all(FLERR,"Fix heat/gran/electric: Thermal conductivity must not be < 0");
-    }
+  for(int i = 1; i < max_type+1; i++)
+  {
+    eConductivity_[i-1] = fix_eConductivity_->compute_vector(i-1);
+    if(eConductivity_[i-1] < 0.)
+      error->all(FLERR,"Fix heat/gran/electric: Thermal conductivity must not be < 0");
+  }
 
   if(area_correction_flag_)
   {
@@ -692,24 +425,21 @@ void FixHeatGranElectric::init()
 
     expo = 1./pair_gran->stressStrainExponent();
 
-    Y = static_cast<FixPropertyGlobal*>(modify->find_fix_property("youngsModulus","property/global","peratomtype",max_type,0,style))->get_values();
-    nu = static_cast<FixPropertyGlobal*>(modify->find_fix_property("poissonsRatio","property/global","peratomtype",max_type,0,style))->get_values();
-    Y_orig = static_cast<FixPropertyGlobal*>(modify->find_fix_property("youngsModulusOriginal","property/global","peratomtype",max_type,0,style))->get_values();
+    Y      = static_cast<FixPropertyGlobal*>(modify->find_fix_property("youngsModulus","property/global","peratomtype",max_type,0,style))->get_values();
+    nu     = static_cast<FixPropertyGlobal*>(modify->find_fix_property("poissonsRatio","property/global","peratomtype",max_type,0,style))->get_values();
+    FixPropertyGlobal *fix_Yorig = static_cast<FixPropertyGlobal*>(modify->find_fix_property("youngsModulusOriginal","property/global","peratomtype",max_type,0,style));
+    Y_orig = fix_Yorig->get_values();
 
-    static_cast<FixPropertyGlobal*>(modify->find_fix_property("youngsModulusOriginal","property/global","peratomtype",max_type,0,style))->new_array(max_type,max_type);
-
+    fix_Yorig->new_array(max_type,max_type);
     for(int i = 1; i < max_type+1; i++)
-    {
       for(int j = 1; j < max_type+1; j++)
       {
         Yeff_ij      = 1./((1.-pow(nu[i-1],2.))/Y[i-1]     +(1.-pow(nu[j-1],2.))/Y[j-1]);
         Yeff_orig_ij = 1./((1.-pow(nu[i-1],2.))/Y_orig[i-1]+(1.-pow(nu[j-1],2.))/Y_orig[j-1]);
         ratio = pow(Yeff_ij/Yeff_orig_ij,expo);
-
-        static_cast<FixPropertyGlobal*>(modify->find_fix_property("youngsModulusOriginal","property/global","peratomtype",max_type,0,style))->array_modify(i-1,j-1,ratio);
+        fix_Yorig->array_modify(i-1,j-1,ratio);
       }
-    }
-    deltan_ratio_ = static_cast<FixPropertyGlobal*>(modify->find_fix_property("youngsModulusOriginal","property/global","peratomtype",max_type,0,style))->get_array_modified();
+    deltan_ratio_ = fix_Yorig->get_array_modified();
   }
   updatePtrs();
 }
@@ -722,10 +452,8 @@ void FixHeatGranElectric::pre_force(int vflag)
   {
     fix_wall_heattransfer_coeff_->set_all(0.);
     fix_wall_temperature_->set_all(0.);
-    fix_wall_electricPotential_->set_all(0.);
+    if (fix_wall_electricPotential_) fix_wall_electricPotential_->set_all(0.);
   }
-
-  fix_total_C->set_all(0.);
 
   fix_qr->set_all(0.);
   fix_rhsG->set_all(0.);
@@ -746,19 +474,16 @@ void FixHeatGranElectric::post_force(int vflag)
 {
   if(history_flag == 0 && CONDUCTION_CONTACT_AREA_OVERLAP == area_calculation_mode_)
     post_force_eval<0,CONDUCTION_CONTACT_AREA_OVERLAP>(vflag,0);
-
   if(history_flag == 1 && CONDUCTION_CONTACT_AREA_OVERLAP == area_calculation_mode_)
     post_force_eval<1,CONDUCTION_CONTACT_AREA_OVERLAP>(vflag,0);
 
   if(history_flag == 0 && CONDUCTION_CONTACT_AREA_CONSTANT == area_calculation_mode_)
     post_force_eval<0,CONDUCTION_CONTACT_AREA_CONSTANT>(vflag,0);
-
   if(history_flag == 1 && CONDUCTION_CONTACT_AREA_CONSTANT == area_calculation_mode_)
     post_force_eval<1,CONDUCTION_CONTACT_AREA_CONSTANT>(vflag,0);
 
   if(history_flag == 0 && CONDUCTION_CONTACT_AREA_PROJECTION == area_calculation_mode_)
     post_force_eval<0,CONDUCTION_CONTACT_AREA_PROJECTION>(vflag,0);
-
   if(history_flag == 1 && CONDUCTION_CONTACT_AREA_PROJECTION == area_calculation_mode_)
     post_force_eval<1,CONDUCTION_CONTACT_AREA_PROJECTION>(vflag,0);
 }
@@ -784,11 +509,6 @@ void FixHeatGranElectric::cpl_evaluate(ComputePairGranLocal *caller)
 template <int HISTFLAG,int CONTACTAREA>
 void FixHeatGranElectric::post_force_eval(int vflag,int cpl_flag)
 {
-  int myrank;
-  MPI_Comm_rank(world,&myrank);
-
-  double erij, ecoi, ecoj;
-
   double hc,contactArea,delta_n,flux,dirFlux[3];
   int i,j,ii,jj,inum,jnum;
   double xtmp,ytmp,ztmp,delx,dely,delz;
@@ -814,19 +534,8 @@ void FixHeatGranElectric::post_force_eval(int vflag,int cpl_flag)
   int *type = atom->type;
   int nlocal = atom->nlocal;
   int *mask = atom->mask;
-  int *tag = atom->tag;
-  std::vector<int> spanningClusters;
 
-  double localSum = 0;
-  for(int i=0; i<nlocal ; i++) localSum+=Temp[i];
-  double globalSum = 0.0;
-  MPI_Allreduce(&localSum,&globalSum,1,MPI_DOUBLE,MPI_SUM,world);
-  int natoms = atom->natoms;
-  double aveT = 1.0* globalSum/natoms;
-
-  if(radiation_flag_) {
-    calculateRadiation();
-  }
+  if(radiation_flag_ && !cpl_flag) calculateRadiation();
 
   updatePtrs();
 
@@ -893,9 +602,10 @@ void FixHeatGranElectric::post_force_eval(int vflag,int cpl_flag)
           }
           else
             contactArea = - M_PI/4.0 * ( (r-radi-radj)*(r+radi-radj)*(r-radi+radj)*(r+radi+radj) )/(r*r);
-        } else if (CONTACTAREA == CONDUCTION_CONTACT_AREA_CONSTANT)
+        }
+        else if (CONTACTAREA == CONDUCTION_CONTACT_AREA_CONSTANT)
           contactArea = fixed_contact_area_;
-        else if (CONTACTAREA == CONDUCTION_CONTACT_AREA_PROJECTION)
+        else
         {
           double rmax = std::max(radi,radj);
           contactArea = M_PI*rmax*rmax;
@@ -952,22 +662,45 @@ void FixHeatGranElectric::post_force_eval(int vflag,int cpl_flag)
   }
 
   if(!cpl_flag && store_contact_data_)
-    for(int i = 0; i < nlocal; i++)
-    {
-      if(n_conduction_contacts_[i] > 0.5)
-        conduction_contact_area_[i] /= n_conduction_contacts_[i];
-    }
+    for(int k = 0; k < nlocal; k++)
+      if(n_conduction_contacts_[k] > 0.5)
+        conduction_contact_area_[k] /= n_conduction_contacts_[k];
 }
 
 void FixHeatGranElectric::end_of_step()
 {
   if (!electricMode_) return;
-  if (update->atime < joule_heat_startTime) return;
+
+  auto removeJouleHeat = [&]() {
+    updatePtrs();
+    const int nlocal = atom->nlocal;
+    const int nall   = nlocal + atom->nghost;
+    double *q = fix_qj->vector_atom;
+    for (int i = 0; i < nlocal; ++i) {
+      const double qold = std::isfinite(q[i]) ? q[i] : 0.0;
+      if (heatSource && qold != 0.0) heatSource[i] -= qold;
+      q[i] = 0.0;
+    }
+    if (fix_qj_pp) fix_qj_pp->set_all(0.0);
+    if (fix_qj_pw) fix_qj_pw->set_all(0.0);
+    if (fix_tot_I) fix_tot_I->set_all(0.0);
+    if (fix_current) {
+      double **I = fix_current->array_atom;
+      for (int i = 0; i < nall; ++i) I[i][0] = I[i][1] = I[i][2] = 0.0;
+    }
+    edges_.clear();
+    esolve_.clear();
+  };
+
+  if (update->atime < joule_heat_startTime) {
+    removeJouleHeat();
+    return;
+  }
 
   double localSum = 0.0;
   long long localCnt = 0;
-
   for (int i = 0; i < atom->nlocal; ++i) {
+    if (!(atom->mask[i] & groupbit)) continue;
     localSum += Temp[i];
     localCnt += 1;
   }
@@ -976,14 +709,15 @@ void FixHeatGranElectric::end_of_step()
   long long gCnt = 0;
   MPI_Allreduce(&localSum, &gSum, 1, MPI_DOUBLE, MPI_SUM, world);
   MPI_Allreduce(&localCnt, &gCnt, 1, MPI_LONG_LONG, MPI_SUM, world);
-  const double aveActive = gCnt ? (gSum / (double)gCnt) : 0.0;
+  const double Tave = gCnt ? (gSum / (double)gCnt) : 0.0;
 
-  if (temp_control_flag_ && aveActive >= temp_control_) {
-    int me; MPI_Comm_rank(world,&me);
-    if (me==0) {
-      printf("[ELECTRIC] Temp gate: Tave=%.3f K >= %.3f K, skipping electric and Joule heating this step\n",
-             aveActive, temp_control_);
+  if (temp_control_flag_ && Tave >= temp_control_) {
+    if (comm->me == 0 && screen) {
+      fprintf(screen,"[ELECTRIC] Temp gate: Tave=%.3f K >= %.3f K, skipping electric and Joule heating this step\n",
+              Tave, temp_control_);
+      fflush(screen);
     }
+    removeJouleHeat();
     return;
   }
 
@@ -1009,6 +743,31 @@ void FixHeatGranElectric::end_of_step()
 template<int HISTFLAG, int CONTACTAREA>
 inline void FixHeatGranElectric::electric_end_step_impl()
 {
+  buildEdgeCache<HISTFLAG, CONTACTAREA>();
+
+  const int nlocal = atom->nlocal;
+  const int nall   = nlocal + atom->nghost;
+  int *type = atom->type;
+  int *mask = atom->mask;
+  double *Rtot = fix_total_C->vector_atom;
+  const double *Gw = fix_pwER ? fix_pwER->vector_atom : NULL;
+
+  for (int i = 0; i < nall; ++i) Rtot[i] = 0.0;
+  for (size_t e = 0; e < edges_.size(); ++e) {
+    Rtot[edges_[e].i] += edges_[e].G;
+    Rtot[edges_[e].j] += edges_[e].G;
+  }
+  fix_total_C->do_reverse_comm();
+
+  for (int i = 0; i < nlocal; ++i) {
+    double Gsum = (std::isfinite(Rtot[i]) && Rtot[i] > 0.0) ? Rtot[i] : 0.0;
+    if (Gw && (mask[i] & groupbit) && type_is_conductive(type[i]-1) &&
+        std::isfinite(Gw[i]) && Gw[i] > 1.0e-40)
+      Gsum += Gw[i];
+    Rtot[i] = (Gsum > 0.0) ? 1.0/Gsum : 0.0;
+  }
+  fix_total_C->do_forward_comm();
+
   detectedComponentsParallel<HISTFLAG, CONTACTAREA>();
   iterativeDomainDecompSolve<HISTFLAG, CONTACTAREA>();
   calculateJouleHeat<HISTFLAG, CONTACTAREA>();
@@ -1016,7 +775,7 @@ inline void FixHeatGranElectric::electric_end_step_impl()
 
 void FixHeatGranElectric::register_compute_pair_local(ComputePairGranLocal *ptr)
 {
-  if(cpl != nullptr)
+  if(cpl != NULL)
     error->all(FLERR,"Fix heat/gran/electric allows only one compute of type pair/local");
   cpl = ptr;
 }
@@ -1025,15 +784,17 @@ void FixHeatGranElectric::unregister_compute_pair_local(ComputePairGranLocal *pt
 {
   if(cpl != ptr)
     error->all(FLERR,"Illegal situation in FixHeatGranElectric::unregister_compute_pair_local");
-  cpl = nullptr;
+  cpl = NULL;
 }
 
-inline bool FixHeatGranElectric::type_is_conductive(int itype) const {
+inline bool FixHeatGranElectric::type_is_conductive(int itype) const
+{
   const double s0 = (sigma0_ ? sigma0_[itype] : e_cond[itype]);
   return std::isfinite(s0) && (s0 > 1e-30);
 }
 
-inline double FixHeatGranElectric::sigma_at_typeT(int itype, double T) const {
+inline double FixHeatGranElectric::sigma_at_typeT(int itype, double T) const
+{
   if (!type_is_conductive(itype)) return 0.0;
 
   const double s0 = (sigma0_ ? sigma0_[itype] : e_cond[itype]);
@@ -1043,9 +804,694 @@ inline double FixHeatGranElectric::sigma_at_typeT(int itype, double T) const {
   if (denom < 1e-6) denom = 1e-6;
 
   double s = s0 / denom;
-
   if (!std::isfinite(s) || s < sigma_floor_) s = sigma_floor_;
   return s;
+}
+
+inline double FixHeatGranElectric::aspot_fraction_for_types(int ti, int tj) const
+{
+  double f = aspot_fraction_global_;
+  if (aspotFrac_)
+    f = 0.5*(std::max(0.0, aspotFrac_[ti]) + std::max(0.0, aspotFrac_[tj]));
+  if (f <= 0.0) return 0.0;
+  if (f > 1.0)  return 1.0;
+  return f;
+}
+
+void FixHeatGranElectric::recoverG0G1(double Gw, double cM, double V0, double V1,
+                                      double& G0, double& G1)
+{
+  G0 = 0.0;
+  G1 = 0.0;
+  if (!(Gw > 1.0e-40) || !std::isfinite(cM)) return;
+  const double dV = V1 - V0;
+  if (std::fabs(dV) < 1.0e-12) { G0 = Gw; return; }
+
+  double g1 = (cM - V0 * Gw) / dV;
+  if (g1 < 0.0) g1 = 0.0;
+  if (g1 > Gw ) g1 = Gw;
+  G1 = g1;
+  G0 = Gw - g1;
+}
+
+template<int HISTFLAG, int CONTACTAREA>
+double FixHeatGranElectric::conductanceLocalIJ(const int i, const int j, double &fi)
+{
+  fi = 0.5;
+  const int ti = atom->type[i] - 1;
+  const int tj = atom->type[j] - 1;
+
+  if (!type_is_conductive(ti) || !type_is_conductive(tj)) return 0.0;
+  const double sigI = sigma_at_typeT(ti, Temp[i]);
+  const double sigJ = sigma_at_typeT(tj, Temp[j]);
+  if (!(sigI > 0.0) || !(sigJ > 0.0)) return 0.0;
+
+  const double *xi = atom->x[i], *xj = atom->x[j];
+  const double ri = atom->radius[i], rj = atom->radius[j];
+  const double rsum = ri + rj;
+  if (!(rsum > 0.0)) return 0.0;
+
+  const double dx = xj[0]-xi[0], dy = xj[1]-xi[1], dz = xj[2]-xi[2];
+  const double r  = std::sqrt(dx*dx + dy*dy + dz*dz);
+  double delta    = rsum - r;
+
+  if (!(delta > 0.0)) {
+    if (!(r < elec_contact_factor_ * rsum)) return 0.0;
+    delta = 0.0;
+  } else if (CONTACTAREA == CONDUCTION_CONTACT_AREA_OVERLAP && deltan_ratio_) {
+    delta *= deltan_ratio_[ti][tj];
+  }
+
+  const double Reff = (ri * rj) / rsum;
+  if (!(Reff > 0.0) || !std::isfinite(Reff)) return 0.0;
+
+  const double delta_floor = elec_min_overlap_frac_ * Reff;
+  if (delta < delta_floor) delta = delta_floor;
+  if (!(delta > 0.0)) return 0.0;
+
+  double a_nom = 0.0;
+  if (CONTACTAREA == CONDUCTION_CONTACT_AREA_OVERLAP) {
+    a_nom = std::sqrt(delta * Reff);
+    const double a_cap = 0.35 * std::min(ri, rj);
+    if (a_nom > a_cap) a_nom = a_cap;
+  } else if (CONTACTAREA == CONDUCTION_CONTACT_AREA_CONSTANT) {
+    const double A = fixed_contact_area_;
+    if (!(A > 0.0)) return 0.0;
+    a_nom = std::sqrt(A / M_PI);
+  } else {
+    a_nom = std::min(ri, rj);
+  }
+  if (!(a_nom > 0.0) || !std::isfinite(a_nom)) return 0.0;
+
+  const double fA = aspot_fraction_for_types(ti, tj);
+  if (!(fA > 0.0) || !std::isfinite(fA)) return 0.0;
+
+  const double a = a_nom * std::sqrt(fA);
+  if (!(a > 0.0) || !std::isfinite(a)) return 0.0;
+
+  const double Ri = 1.0 / (4.0 * a * sigI);
+  const double Rj = 1.0 / (4.0 * a * sigJ);
+  const double R  = Ri + Rj;
+  if (!(R > 0.0) || !std::isfinite(R)) return 0.0;
+
+  const double G = 1.0 / R;
+  fi = Ri / R;
+
+  if (!std::isfinite(G) || G < Cmin_branch_) return 0.0;
+  return G;
+}
+
+template<int HISTFLAG, int CONTACTAREA>
+void FixHeatGranElectric::buildEdgeCache()
+{
+  const int nloc = atom->nlocal;
+  int    *mask = atom->mask;
+  int    *type = atom->type;
+  tagint *tag  = atom->tag;
+
+  const int inum   = pair_gran->list->inum;
+  int *ilist       = pair_gran->list->ilist;
+  int *numneigh    = pair_gran->list->numneigh;
+  int **firstneigh = pair_gran->list->firstneigh;
+
+  edges_.clear();
+  esolve_.clear();
+  if ((int)edges_.capacity() < 8*nloc) edges_.reserve(8*nloc);
+
+  for (int ii = 0; ii < inum; ++ii) {
+    const int i = ilist[ii];
+    if (i >= nloc) continue;
+    if (!(mask[i] & groupbit)) continue;
+    if (!type_is_conductive(type[i]-1)) continue;
+
+    int *jlist = firstneigh[i];
+    const int jnum = numneigh[i];
+    for (int jj = 0; jj < jnum; ++jj) {
+      const int j = jlist[jj] & NEIGHMASK;
+      if (!(mask[j] & groupbit)) continue;
+      if (!type_is_conductive(type[j]-1)) continue;
+
+      bool owner;
+      if (j < nloc) owner = true;
+      else          owner = (tag[i] < tag[j]);
+      if (!owner) continue;
+
+      double fi = 0.5;
+      const double G = conductanceLocalIJ<HISTFLAG,CONTACTAREA>(i, j, fi);
+      if (!(G > 0.0) || !std::isfinite(G)) continue;
+
+      edges_.push_back(EdgeCG{i, j, G, fi});
+    }
+  }
+}
+
+int FixHeatGranElectric::uf_find(std::vector<int>& p, int x)
+{
+  int r = x;
+  while (p[r] != r) r = p[r];
+  while (p[x] != r) {
+    const int next = p[x];
+    p[x] = r;
+    x = next;
+  }
+  return r;
+}
+
+void FixHeatGranElectric::uf_union(std::vector<int>& p, std::vector<int>& sz, int a, int b)
+{
+  a = uf_find(p,a);
+  b = uf_find(p,b);
+  if (a == b) return;
+  if (sz[a] < sz[b]) std::swap(a,b);
+  p[b] = a;
+  sz[a] += sz[b];
+}
+
+template<int HISTFLAG, int CONTACTAREA>
+void FixHeatGranElectric::detectedComponentsParallel()
+{
+  if (fix_pwER)    fix_pwER->do_forward_comm();
+  if (fix_pwEP)    fix_pwEP->do_forward_comm();
+  if (fix_cMatrix) fix_cMatrix->do_forward_comm();
+
+  const int nlocal = atom->nlocal;
+  const int nall   = nlocal + atom->nghost;
+  int *type = atom->type;
+  int *mask = atom->mask;
+  const bool logStep = (update->ntimestep % std::max(1, electric_log_stride_) == 0);
+
+  double *Gw  = fix_pwER->vector_atom;
+  double *Vw  = fix_pwEP->vector_atom;
+  double *cM  = fix_cMatrix->vector_atom;
+  double *cid = fix_compID->vector_atom;
+
+  for (int i = 0; i < nall; ++i) cid[i] = 0.0;
+
+  double vmin_loc =  std::numeric_limits<double>::infinity();
+  double vmax_loc = -std::numeric_limits<double>::infinity();
+  int nwall_loc = 0;
+
+  for (int i = 0; i < nlocal; ++i) {
+    if (!(mask[i] & groupbit))          continue;
+    if (!type_is_conductive(type[i]-1)) continue;
+    if (!(Gw[i] > 1.0e-40))             continue;
+    if (!std::isfinite(Vw[i]))          continue;
+    vmin_loc = std::min(vmin_loc, Vw[i]);
+    vmax_loc = std::max(vmax_loc, Vw[i]);
+    ++nwall_loc;
+  }
+
+  double v0, v1;
+  int nwall_glb;
+  MPI_Allreduce(&vmin_loc,  &v0,        1, MPI_DOUBLE, MPI_MIN, world);
+  MPI_Allreduce(&vmax_loc,  &v1,        1, MPI_DOUBLE, MPI_MAX, world);
+  MPI_Allreduce(&nwall_loc, &nwall_glb, 1, MPI_INT,    MPI_SUM, world);
+
+  if (!std::isfinite(v0)) { v0 = 0.0; v1 = 0.0; }
+  if (!std::isfinite(v1)) v1 = v0;
+
+  V0_global_    = v0;
+  V1_global_    = v1;
+  two_terminal_ = (std::fabs(v1 - v0) > 1.0e-12);
+
+  if (comm->me == 0 && screen && (update->ntimestep % 1000 == 0)) {
+    fprintf(screen,"[ELECTRIC] step=%lld  wall_contacts=%d  V0=%.4g  V1=%.4g  two_terminal=%d\n",
+            (long long)update->ntimestep, nwall_glb, v0, v1, (int)two_terminal_);
+    fflush(screen);
+  }
+
+  if (!two_terminal_) {
+    fix_compID->do_forward_comm();
+    return;
+  }
+
+  fix_rhsG->set_all(0.0);
+  fix_diagFlag->set_all(0.0);
+  double *reachAnode   = fix_rhsG->vector_atom;
+  double *reachCathode = fix_diagFlag->vector_atom;
+
+  for (int i = 0; i < nlocal; ++i) {
+    if (!(mask[i] & groupbit))          continue;
+    if (!type_is_conductive(type[i]-1)) continue;
+    if (!(Gw[i] > 1.0e-40))             continue;
+    double G0, G1;
+    recoverG0G1(Gw[i], cM[i], v0, v1, G0, G1);
+    if (G0 > 0.0) reachCathode[i] = 1.0;
+    if (G1 > 0.0) reachAnode[i]   = 1.0;
+  }
+  fix_rhsG->do_forward_comm();
+  fix_diagFlag->do_forward_comm();
+
+  uf_p_.resize(nall);
+  uf_sz_.assign(nall, 1);
+  for (int i = 0; i < nall; ++i) uf_p_[i] = i;
+  for (size_t e = 0; e < edges_.size(); ++e)
+    uf_union(uf_p_, uf_sz_, edges_[e].i, edges_[e].j);
+
+  const int RMAX = 1000;
+  int rounds = 0;
+  long long prev_total = -1;
+
+  while (rounds < RMAX) {
+    uf_rootA_.assign(nall, 0.0);
+    uf_rootK_.assign(nall, 0.0);
+    for (int m = 0; m < nall; ++m) {
+      const int r = uf_find(uf_p_, m);
+      if (reachAnode[m]   > 0.5) uf_rootA_[r] = 1.0;
+      if (reachCathode[m] > 0.5) uf_rootK_[r] = 1.0;
+    }
+    for (int m = 0; m < nall; ++m) {
+      const int r = uf_find(uf_p_, m);
+      if (uf_rootA_[r] > 0.5) reachAnode[m]   = 1.0;
+      if (uf_rootK_[r] > 0.5) reachCathode[m] = 1.0;
+    }
+
+    fix_rhsG->do_reverse_comm();
+    fix_diagFlag->do_reverse_comm();
+    for (int i = 0; i < nlocal; ++i) {
+      reachAnode[i]   = (reachAnode[i]   > 0.5) ? 1.0 : 0.0;
+      reachCathode[i] = (reachCathode[i] > 0.5) ? 1.0 : 0.0;
+    }
+    fix_rhsG->do_forward_comm();
+    fix_diagFlag->do_forward_comm();
+
+    long long cnt_loc = 0;
+    for (int i = 0; i < nlocal; ++i) {
+      if (reachAnode[i]   > 0.5) ++cnt_loc;
+      if (reachCathode[i] > 0.5) ++cnt_loc;
+    }
+    long long cnt_glb = 0;
+    MPI_Allreduce(&cnt_loc, &cnt_glb, 1, MPI_LONG_LONG, MPI_SUM, world);
+
+    ++rounds;
+    if (cnt_glb == prev_total) break;
+    prev_total = cnt_glb;
+  }
+
+  if (rounds >= RMAX && comm->me == 0 && screen)
+    fprintf(screen,"[ELECTRIC] warning: component merge hit cap %d\n", RMAX);
+
+  std::vector<int> degree(nall, 0);
+  for (size_t e = 0; e < edges_.size(); ++e) {
+    ++degree[edges_[e].i];
+    ++degree[edges_[e].j];
+  }
+
+  double *connClass = fix_deltaE ? fix_deltaE->vector_atom : NULL;
+
+  int n_active = 0, n_wall_active = 0, n_isolated = 0, n_floating = 0, n_oneSide = 0;
+  long long degree_sum = 0;
+
+  for (int i = 0; i < nlocal; ++i) {
+    const bool a = (reachAnode[i]   > 0.5);
+    const bool k = (reachCathode[i] > 0.5);
+
+    int cls;
+    if (a && k)            cls = 3;
+    else if (a || k)       cls = 2;
+    else if (degree[i] > 0) cls = 1;
+    else                   cls = 0;
+
+    if (connClass) connClass[i] = (double)cls;
+    degree_sum += degree[i];
+
+    if (cls == 3) {
+      cid[i] = 1.0;
+      ++n_active;
+      if (Gw[i] > 1.0e-40) ++n_wall_active;
+    }
+    else if (cls == 2) ++n_oneSide;
+    else if (cls == 1) ++n_floating;
+    else               ++n_isolated;
+  }
+  fix_compID->do_forward_comm();
+  if (fix_deltaE) fix_deltaE->do_forward_comm();
+
+  int counts_loc[5] = { n_active, n_wall_active, n_oneSide, n_floating, n_isolated };
+  int counts_glb[5];
+  MPI_Allreduce(counts_loc, counts_glb, 5, MPI_INT, MPI_SUM, world);
+  long long degree_sum_glb = 0;
+  MPI_Allreduce(&degree_sum, &degree_sum_glb, 1, MPI_LONG_LONG, MPI_SUM, world);
+
+  if (comm->me == 0 && screen && logStep) {
+    const long long ntot = (long long)atom->natoms;
+    const double zbar = ntot ? (double)degree_sum_glb / (double)ntot : 0.0;
+    fprintf(screen,"[ELECTRIC-DET] active=%d  wall_active=%d  rounds=%d | stub=%d  floating=%d  isolated=%d  <z_elec>=%.2f\n",
+            counts_glb[0], counts_glb[1], rounds, counts_glb[2], counts_glb[3], counts_glb[4], 2.0*zbar);
+    fflush(screen);
+  }
+}
+
+void FixHeatGranElectric::buildLocalIC0()
+{
+  const int nloc = atom->nlocal;
+
+  ic_map_.assign(nloc, -1);
+  ic_inv_.clear();
+  for (int i = 0; i < nloc; ++i)
+    if (active_[i]) {
+      ic_map_[i] = (int)ic_inv_.size();
+      ic_inv_.push_back(i);
+    }
+
+  const int n = (int)ic_inv_.size();
+  ic_n_  = n;
+  ic_ok_ = false;
+  if (n == 0) return;
+
+  std::vector<int> rowCount(n, 0);
+  std::vector<int> rowOf, colOf;
+  std::vector<double> gOf;
+  rowOf.reserve(edges_.size());
+  colOf.reserve(edges_.size());
+  gOf.reserve(edges_.size());
+
+  const size_t nedge = edges_.size();
+  for (size_t t = 0; t < esolve_.size(); ++t) {
+    const int eidx = esolve_[t];
+    if (eidx < 0 || (size_t)eidx >= nedge) continue;
+    const EdgeCG& ed = edges_[eidx];
+    if (ed.j >= nloc) continue;
+    int a = ic_map_[ed.i], b = ic_map_[ed.j];
+    if (a < 0 || b < 0 || a == b) continue;
+    if (a < b) std::swap(a,b);
+    rowOf.push_back(a);
+    colOf.push_back(b);
+    gOf.push_back(ed.G);
+    ++rowCount[a];
+  }
+
+  icLp_.assign(n+1, 0);
+  for (int r = 0; r < n; ++r) icLp_[r+1] = icLp_[r] + rowCount[r];
+  const int nnz = icLp_[n];
+  icLj_ .assign(nnz, 0);
+  icLx0_.assign(nnz, 0.0);
+  icLx_ .assign(nnz, 0.0);
+  {
+    std::vector<int> pos(icLp_.begin(), icLp_.begin()+n);
+    for (size_t t = 0; t < rowOf.size(); ++t) {
+      const int p = pos[rowOf[t]]++;
+      icLj_[p]  = colOf[t];
+      icLx0_[p] = -gOf[t];
+    }
+  }
+
+  for (int r = 0; r < n; ++r) {
+    for (int p = icLp_[r]+1; p < icLp_[r+1]; ++p) {
+      const int    cj = icLj_[p];
+      const double cv = icLx0_[p];
+      int q = p-1;
+      while (q >= icLp_[r] && icLj_[q] > cj) {
+        icLj_[q+1]  = icLj_[q];
+        icLx0_[q+1] = icLx0_[q];
+        --q;
+      }
+      icLj_[q+1]  = cj;
+      icLx0_[q+1] = cv;
+    }
+  }
+
+  icCp_.assign(n+1, 0);
+  for (int p = 0; p < nnz; ++p) ++icCp_[icLj_[p]+1];
+  for (int k = 0; k < n; ++k) icCp_[k+1] += icCp_[k];
+  icCi_.assign(nnz, 0);
+  icCq_.assign(nnz, 0);
+  {
+    std::vector<int> pos(icCp_.begin(), icCp_.begin()+n);
+    for (int r = 0; r < n; ++r)
+      for (int p = icLp_[r]; p < icLp_[r+1]; ++p) {
+        const int k = icLj_[p];
+        const int q = pos[k]++;
+        icCi_[q] = r;
+        icCq_[q] = p;
+      }
+  }
+
+  icAd_.assign(n, 0.0);
+  for (int c = 0; c < n; ++c) icAd_[c] = cg_diag_[ic_inv_[c]];
+
+  icLd_.assign(n, 0.0);
+  ic_w_.assign(n, 0.0);
+  ic_y_.assign(n, 0.0);
+  ic_mark_.assign(n, -1);
+
+  double shift = 0.0;
+  for (int attempt = 0; attempt < 6 && !ic_ok_; ++attempt) {
+    icLx_ = icLx0_;
+    std::fill(ic_mark_.begin(), ic_mark_.end(), -1);
+    bool ok = true;
+
+    for (int i = 0; i < n && ok; ++i) {
+      for (int p = icLp_[i]; p < icLp_[i+1]; ++p) {
+        const int k = icLj_[p];
+        ic_w_[k] = icLx0_[p];
+        ic_mark_[k] = i;
+      }
+      double d = icAd_[i] * (1.0 + shift);
+
+      for (int p = icLp_[i]; p < icLp_[i+1]; ++p) {
+        const int k = icLj_[p];
+        const double lik = ic_w_[k] / icLd_[k];
+        ic_w_[k] = lik;
+        d -= lik*lik;
+        for (int q = icCp_[k]; q < icCp_[k+1]; ++q) {
+          const int j = icCi_[q];
+          if (j >= i) break;
+          if (ic_mark_[j] != i) continue;
+          ic_w_[j] -= lik * icLx_[icCq_[q]];
+        }
+      }
+
+      if (!(d > 1.0e-300) || !std::isfinite(d)) { ok = false; break; }
+      icLd_[i] = std::sqrt(d);
+      for (int p = icLp_[i]; p < icLp_[i+1]; ++p) icLx_[p] = ic_w_[icLj_[p]];
+    }
+
+    ic_ok_ = ok;
+    if (!ok) shift = (shift == 0.0) ? 1.0e-3 : shift*10.0;
+  }
+}
+
+void FixHeatGranElectric::applyPrecond(const std::vector<double>& r, std::vector<double>& z)
+{
+  const int nloc = atom->nlocal;
+  std::fill(z.begin(), z.begin()+nloc, 0.0);
+
+  if (!ic_ok_ || ic_n_ == 0) {
+    for (int i = 0; i < nloc; ++i)
+      if (active_[i] && cg_diag_[i] > 0.0) z[i] = r[i] / cg_diag_[i];
+    return;
+  }
+
+  const int n = ic_n_;
+  for (int c = 0; c < n; ++c) ic_y_[c] = r[ic_inv_[c]];
+
+  for (int i = 0; i < n; ++i) {
+    double s = ic_y_[i];
+    for (int p = icLp_[i]; p < icLp_[i+1]; ++p) s -= icLx_[p] * ic_y_[icLj_[p]];
+    ic_y_[i] = s / icLd_[i];
+  }
+  for (int i = n-1; i >= 0; --i) {
+    const double s = ic_y_[i] / icLd_[i];
+    ic_y_[i] = s;
+    for (int p = icLp_[i]; p < icLp_[i+1]; ++p) ic_y_[icLj_[p]] -= icLx_[p] * s;
+  }
+
+  for (int c = 0; c < n; ++c) z[ic_inv_[c]] = ic_y_[c];
+}
+
+template<int HISTFLAG, int CONTACTAREA>
+void FixHeatGranElectric::iterativeDomainDecompSolve()
+{
+  esolve_.clear();
+  if (!two_terminal_) return;
+
+  fix_pwER->do_forward_comm();
+  fix_cMatrix->do_forward_comm();
+  fix_compID->do_forward_comm();
+  fix_eP->do_forward_comm();
+
+  const int nloc = atom->nlocal;
+  const int nall = nloc + atom->nghost;
+  const bool logStep = (update->ntimestep % std::max(1, electric_log_stride_) == 0);
+
+  double *V   = fix_eP->vector_atom;
+  double *Gw  = fix_pwER->vector_atom;
+  double *cM  = fix_cMatrix->vector_atom;
+  double *cid = fix_compID->vector_atom;
+
+  double *sumPP  = fix_rhsG->vector_atom;
+  double *diagPP = fix_diagFlag->vector_atom;
+  zero_with_ghosts(fix_rhsG,     nall);
+  zero_with_ghosts(fix_diagFlag, nall);
+
+  const double V0    = V0_global_, V1 = V1_global_;
+  const double Vmid  = 0.5*(V0 + V1);
+  const double Vlo   = std::min(V0, V1);
+  const double Vhi   = std::max(V0, V1);
+  const double tinyC = 1.0e-40;
+
+  active_.assign(nall, 0);
+  for (int i = 0; i < nall; ++i) active_[i] = (cid[i] > 0.5) ? 1 : 0;
+
+  int nsolve_loc = 0;
+  for (int i = 0; i < nloc; ++i) nsolve_loc += active_[i];
+  int nsolve_glb = 0;
+  MPI_Allreduce(&nsolve_loc, &nsolve_glb, 1, MPI_INT, MPI_SUM, world);
+  if (nsolve_glb == 0) {
+    ic_n_  = 0;
+    ic_ok_ = false;
+    if (comm->me == 0 && screen && logStep) {
+      fprintf(screen,"[ELECTRIC-SOL] no percolating path this step, skipping solve\n");
+      fflush(screen);
+    }
+    return;
+  }
+
+  for (int i = 0; i < nloc; ++i) {
+    if (!active_[i]) {
+      if (Gw[i] > tinyC) {
+        double G0, G1;
+        recoverG0G1(Gw[i], cM[i], V0, V1, G0, G1);
+        if      (G0 > 0.0 && G1 == 0.0) V[i] = V0;
+        else if (G1 > 0.0 && G0 == 0.0) V[i] = V1;
+      } else V[i] = eP0;
+      continue;
+    }
+    if (!std::isfinite(V[i]) || V[i] < Vlo || V[i] > Vhi) {
+      if (Gw[i] > tinyC) {
+        double G0, G1;
+        recoverG0G1(Gw[i], cM[i], V0, V1, G0, G1);
+        const double Gs = G0 + G1;
+        V[i] = (Gs > 0.0) ? (0.7*(G0*V0 + G1*V1)/Gs + 0.3*Vmid) : Vmid;
+      } else V[i] = Vmid;
+    }
+  }
+  fix_eP->do_forward_comm();
+
+  esolve_.reserve(edges_.size());
+  for (size_t e = 0; e < edges_.size(); ++e)
+    if (active_[edges_[e].i] && active_[edges_[e].j]) esolve_.push_back((int)e);
+
+  for (size_t t = 0; t < esolve_.size(); ++t) {
+    const EdgeCG& ed = edges_[esolve_[t]];
+    diagPP[ed.i] += ed.G;
+    diagPP[ed.j] += ed.G;
+  }
+  fix_diagFlag->do_reverse_comm();
+
+  cg_diag_.assign(nloc, 0.0);
+  int n_zero_diag = 0;
+  for (int i = 0; i < nloc; ++i) {
+    if (!active_[i]) continue;
+    const double dpp = std::isfinite(diagPP[i]) ? std::max(0.0, diagPP[i]) : 0.0;
+    const double Gwi = std::isfinite(Gw[i])     ? std::max(0.0, Gw[i])     : 0.0;
+    cg_diag_[i] = dpp + Gwi;
+    if (!(cg_diag_[i] > 0.0)) ++n_zero_diag;
+  }
+  int n_zero_diag_glb = 0;
+  MPI_Allreduce(&n_zero_diag, &n_zero_diag_glb, 1, MPI_INT, MPI_SUM, world);
+  if (n_zero_diag_glb > 0 && comm->me == 0 && screen) {
+    fprintf(screen,"[ELECTRIC-SOL] WARNING: %d active particles have diag=0\n", n_zero_diag_glb);
+    fflush(screen);
+  }
+
+  buildLocalIC0();
+
+  const int    KMAX = 2000;
+  const double RTOL = 1.0e-8;
+
+  cg_x_ .assign(nloc, 0.0);
+  cg_r_ .assign(nloc, 0.0);
+  cg_z_ .assign(nloc, 0.0);
+  cg_p_ .assign(nloc, 0.0);
+  cg_Ap_.assign(nloc, 0.0);
+  cg_Vbk_.assign(nloc, 0.0);
+
+  for (int i = 0; i < nloc; ++i) if (active_[i]) cg_x_[i] = V[i];
+
+  auto matvec = [&](const std::vector<double>& x_in, std::vector<double>& y_out)
+  {
+    for (int i = 0; i < nloc; ++i) cg_Vbk_[i] = V[i];
+    for (int i = 0; i < nloc; ++i) if (active_[i]) V[i] = x_in[i];
+    fix_eP->do_forward_comm();
+
+    for (int i = 0; i < nall; ++i) sumPP[i] = 0.0;
+    for (size_t t = 0; t < esolve_.size(); ++t) {
+      const EdgeCG& ed = edges_[esolve_[t]];
+      sumPP[ed.i] += ed.G * V[ed.j];
+      sumPP[ed.j] += ed.G * V[ed.i];
+    }
+    fix_rhsG->do_reverse_comm();
+
+    for (int i = 0; i < nloc; ++i) {
+      if (!active_[i]) { y_out[i] = 0.0; continue; }
+      const double sp = std::isfinite(sumPP[i]) ? sumPP[i] : 0.0;
+      y_out[i] = cg_diag_[i] * x_in[i] - sp;
+    }
+    for (int i = 0; i < nloc; ++i) V[i] = cg_Vbk_[i];
+  };
+
+  auto dotprod = [&](const std::vector<double>& a, const std::vector<double>& b) -> double
+  {
+    double s_loc = 0.0;
+    for (int i = 0; i < nloc; ++i) if (active_[i]) s_loc += a[i]*b[i];
+    double s_glb = 0.0;
+    MPI_Allreduce(&s_loc, &s_glb, 1, MPI_DOUBLE, MPI_SUM, world);
+    return s_glb;
+  };
+
+  matvec(cg_x_, cg_Ap_);
+  for (int i = 0; i < nloc; ++i) {
+    if (!active_[i]) continue;
+    const double bi = std::isfinite(cM[i]) ? cM[i] : 0.0;
+    cg_r_[i] = bi - cg_Ap_[i];
+  }
+  applyPrecond(cg_r_, cg_z_);
+  for (int i = 0; i < nloc; ++i) if (active_[i]) cg_p_[i] = cg_z_[i];
+
+  double rz_old = dotprod(cg_r_, cg_z_);
+  const double rz0 = std::max(rz_old, 1.0e-30);
+
+  int iter = 0;
+  for (iter = 0; iter < KMAX; ++iter) {
+    matvec(cg_p_, cg_Ap_);
+    const double pAp = dotprod(cg_p_, cg_Ap_);
+    if (!(pAp > 0.0)) break;
+
+    const double alpha = rz_old / pAp;
+    for (int i = 0; i < nloc; ++i) {
+      if (!active_[i]) continue;
+      cg_x_[i] += alpha * cg_p_[i];
+      cg_r_[i] -= alpha * cg_Ap_[i];
+    }
+
+    applyPrecond(cg_r_, cg_z_);
+    const double rz_new = dotprod(cg_r_, cg_z_);
+    if (rz_new < RTOL * RTOL * rz0) { ++iter; break; }
+
+    const double beta = rz_new / rz_old;
+    for (int i = 0; i < nloc; ++i)
+      if (active_[i]) cg_p_[i] = cg_z_[i] + beta * cg_p_[i];
+    rz_old = rz_new;
+  }
+
+  for (int i = 0; i < nloc; ++i) if (active_[i]) V[i] = cg_x_[i];
+  fix_eP->do_forward_comm();
+
+  matvec(cg_x_, cg_Ap_);
+  double rmax_loc = 0.0;
+  for (int i = 0; i < nloc; ++i)
+    if (active_[i]) rmax_loc = std::max(rmax_loc, std::fabs(cM[i] - cg_Ap_[i]));
+  double rmax_glb = 0.0;
+  MPI_Allreduce(&rmax_loc, &rmax_glb, 1, MPI_DOUBLE, MPI_MAX, world);
+
+  if (comm->me == 0 && screen && (logStep || iter >= KMAX)) {
+    fprintf(screen,"[ELECTRIC] CG solve: iters=%d  edges=%zu  nact=%d  max|r|=%.3e  precond=%s%s\n",
+            iter, esolve_.size(), nsolve_glb, rmax_glb,
+            ic_ok_ ? "IC0" : "Jacobi", (iter >= KMAX) ? "  (NOT CONVERGED)" : "");
+    fflush(screen);
+  }
 }
 
 template<int HISTFLAG, int CONTACTAREA>
@@ -1057,907 +1503,155 @@ void FixHeatGranElectric::calculateJouleHeat()
   if (ts != last_ts) { last_ts = ts; calls = 0; }
   const bool first_call = (++calls == 1);
 
-  fix_eP->do_forward_comm();
-  if (fix_pwER)    fix_pwER->do_forward_comm();
-  if (fix_cMatrix) fix_cMatrix->do_forward_comm();
-  if (fix_pwEP)    fix_pwEP->do_forward_comm();
-  if (fix_total_C) fix_total_C->do_forward_comm();
+  updatePtrs();
 
   const int nlocal = atom->nlocal;
-  double *V   = fix_eP->vector_atom;
-  double *GwA = fix_pwER->vector_atom;
-  double *cM  = fix_cMatrix->vector_atom;
-  double *VwT = fix_pwEP->vector_atom;
+  const int nall   = nlocal + atom->nghost;
+  int *type = atom->type;
+  int *mask = atom->mask;
 
-  double *qj     = fix_qj->vector_atom;
-  double *qj_pp  = fix_qj_pp->vector_atom;
-  double *qj_pw  = fix_qj_pw->vector_atom;
-  double *tot_I  = fix_tot_I->vector_atom;
-  double *totalC = fix_total_C ? fix_total_C->vector_atom : nullptr;
-  double **Iviz  = fix_current->array_atom;
+  double  *V    = fix_eP->vector_atom;
+  double  *Gw   = fix_pwER->vector_atom;
+  double  *cM   = fix_cMatrix->vector_atom;
+  double  *cid  = fix_compID->vector_atom;
+  double  *qj   = fix_qj->vector_atom;
+  double **Iviz = fix_current->array_atom;
 
-  const double epsV  = 1e-12;
-  const double epsC  = 1e-40;
-  const double epsR2 = 1e-30;
+  zero_with_ghosts(fix_qj_pp, nall);
+  zero_with_ghosts(fix_qj_pw, nall);
+  for (int i = 0; i < nall; ++i) Iviz[i][0] = Iviz[i][1] = Iviz[i][2] = 0.0;
+  double *qpp = fix_qj_pp->vector_atom;
+  double *qpw = fix_qj_pw->vector_atom;
 
-  for (int i=0;i<nlocal+atom->nghost;++i) { Iviz[i][0]=Iviz[i][1]=Iviz[i][2]=0.0; }
-
-  fix_rhsG->set_all(0.0);
-  fix_diagFlag->set_all(0.0);
-  double *ppHalfToJ = fix_rhsG->vector_atom;
-  double *diagPP    = fix_diagFlag->vector_atom;
-
-  double vmin_loc =  std::numeric_limits<double>::infinity();
-  double vmax_loc = -std::numeric_limits<double>::infinity();
-  double Gw_sum_loc = 0.0;
-
-  for (int i=0;i<nlocal;++i) {
-    if (GwA[i] > epsC && std::isfinite(VwT[i])) {
-      vmin_loc = std::min(vmin_loc, VwT[i]);
-      vmax_loc = std::max(vmax_loc, VwT[i]);
-      Gw_sum_loc += GwA[i];
+  if (!two_terminal_) {
+    for (int i = 0; i < nlocal; ++i) {
+      const double qold = std::isfinite(qj[i]) ? qj[i] : 0.0;
+      qj[i] = 0.0;
+      if (first_call && heatSource) heatSource[i] -= qold;
     }
-  }
-
-  double V0=vmin_loc, V1=vmax_loc, Gw_sum=Gw_sum_loc;
-  MPI_Allreduce(&vmin_loc,&V0,   1,MPI_DOUBLE,MPI_MIN,world);
-  MPI_Allreduce(&vmax_loc,&V1,   1,MPI_DOUBLE,MPI_MAX,world);
-  MPI_Allreduce(&Gw_sum_loc,&Gw_sum,1,MPI_DOUBLE,MPI_SUM,world);
-
-  const bool any_wall = (Gw_sum > epsC);
-  if (!std::isfinite(V0)) V0 = 0.0;
-  if (!std::isfinite(V1)) V1 = V0;
-
-  const double dVw = V1 - V0;
-  const bool two_terminal = (std::fabs(dVw) > epsV);
-
-  if (!any_wall) {
-    double Ppp_loc = 0.0;
-    for (int i=0;i<nlocal;++i) {
-      if (totalC) totalC[i] = 0.0;
-      qj_pp[i]=qj_pw[i]=0.0;
-      if (first_call) { if (heatSource) heatSource[i] += (0.0 - (std::isfinite(qj[i])?qj[i]:0.0)); }
-      qj[i]=0.0; tot_I[i]=0.0;
-    }
-    double Ppp=0.0;
-    MPI_Allreduce(&Ppp_loc,&Ppp,1,MPI_DOUBLE,MPI_SUM,world);
+    fix_tot_I->set_all(0.0);
     return;
   }
 
+  fix_eP->do_forward_comm();
+  fix_compID->do_forward_comm();
+
+  const double V0 = V0_global_, V1 = V1_global_;
+  double **x = atom->x;
+
+  const size_t nedge = edges_.size();
   double Ppp_loc = 0.0;
-  std::vector<double> qpp_new(nlocal,0.0), qpw_new(nlocal,0.0);
+  for (size_t t = 0; t < esolve_.size(); ++t) {
+    const int eidx = esolve_[t];
+    if (eidx < 0 || (size_t)eidx >= nedge) continue;
+    const EdgeCG& ed = edges_[eidx];
+    const int i = ed.i, j = ed.j;
+    if (i < 0 || i >= nall || j < 0 || j >= nall) continue;
 
-  if (two_terminal) {
-    int inum = pair_gran->list->inum;
-    int *ilist = pair_gran->list->ilist;
-    int *numneigh = pair_gran->list->numneigh;
-    int **firstneigh = pair_gran->list->firstneigh;
-    int **firstHist  = (HISTFLAG && pair_gran->listgranhistory)
-                     ? pair_gran->listgranhistory->firstneigh : nullptr;
-    double **x = atom->x;
-    int *type = atom->type;
-    tagint *tags = atom->tag_enable ? atom->tag : nullptr;
+    const double dV = V[i] - V[j];
+    if (!std::isfinite(dV)) continue;
+    const double Q = ed.G * dV * dV;
+    if (!(Q >= 0.0)) continue;
 
-    for (int ii=0; ii<inum; ++ii) {
-      const int i = ilist[ii];
-      if (i>=nlocal) continue;
-      const int ti = type[i]-1;
-      if (ti<0) continue;
+    Ppp_loc += Q;
+    const double fi = (ed.fi >= 0.0 && ed.fi <= 1.0) ? ed.fi : 0.5;
+    qpp[i] += fi * Q;
+    qpp[j] += (1.0 - fi) * Q;
 
-      int *jlist = firstneigh[i];
-      const int jnum = numneigh[i];
+    const double dx = x[i][0]-x[j][0], dy = x[i][1]-x[j][1], dz = x[i][2]-x[j][2];
+    const double r2 = dx*dx + dy*dy + dz*dz;
+    if (r2 > 1.0e-30) {
+      const double rinv = 1.0/std::sqrt(r2);
+      const double Iij  = ed.G * dV;
+      Iviz[i][0] -= Iij*dx*rinv; Iviz[i][1] -= Iij*dy*rinv; Iviz[i][2] -= Iij*dz*rinv;
+      Iviz[j][0] -= Iij*dx*rinv; Iviz[j][1] -= Iij*dy*rinv; Iviz[j][2] -= Iij*dz*rinv;
+    }
+  }
+  fix_qj_pp->do_reverse_comm();
+  fix_current->do_reverse_comm();
+  qpp = fix_qj_pp->vector_atom;
 
-      for (int jj=0; jj<jnum; ++jj) {
-        bool unique = true;
-        if (HISTFLAG && firstHist) unique = (firstHist[i][jj] != 0);
-        else if (tags)             unique = (tags[i] < atom->tag[jlist[jj] & NEIGHMASK]);
-        else                       unique = (i < (jlist[jj] & NEIGHMASK));
-        if (!unique) continue;
+  double I0_loc = 0.0, I1_loc = 0.0, Ppw_loc = 0.0;
+  for (int i = 0; i < nlocal; ++i) {
+    if (!(mask[i] & groupbit))          continue;
+    if (cid[i] <= 0.5)                  continue;
+    if (!type_is_conductive(type[i]-1)) continue;
+    if (!(Gw[i] > 1.0e-40))             continue;
 
-        const int j = jlist[jj] & NEIGHMASK;
-        const int tj = type[j]-1;
-        if (tj<0) continue;
+    double G0, G1;
+    recoverG0G1(Gw[i], cM[i], V0, V1, G0, G1);
 
-        const double Gij = conductanceLocalIJ<HISTFLAG,CONTACTAREA>(i,j);
-        if (!(Gij > epsC) || !std::isfinite(Gij)) continue;
+    const double dV0 = V0 - V[i];
+    const double dV1 = V1 - V[i];
+    if (!std::isfinite(dV0) || !std::isfinite(dV1)) continue;
 
-        diagPP[i] += Gij;
-        diagPP[j] += Gij;
+    I0_loc += G0 * dV0;
+    I1_loc += G1 * dV1;
 
-        const double dV = V[i] - V[j];
-        if (!std::isfinite(dV)) continue;
-
-        const double Qij = Gij * dV * dV;
-        if (!(Qij >= 0.0) || !std::isfinite(Qij)) continue;
-
-        Ppp_loc += Qij;
-        const double halfQ = 0.5*Qij;
-        qpp_new[i]   += halfQ;
-        ppHalfToJ[j] += halfQ;
-
-        const double dx=x[i][0]-x[j][0], dy=x[i][1]-x[j][1], dz=x[i][2]-x[j][2];
-        const double r2 = dx*dx+dy*dy+dz*dz;
-        if (r2 > epsR2) {
-          const double rinv = 1.0/std::sqrt(r2);
-          const double Iij  = Gij * dV;
-          if (std::isfinite(Iij)) {
-            Iviz[i][0] += -Iij*dx*rinv;
-            Iviz[i][1] += -Iij*dy*rinv;
-            Iviz[i][2] += -Iij*dz*rinv;
-
-            Iviz[j][0] +=  Iij*dx*rinv;
-            Iviz[j][1] +=  Iij*dy*rinv;
-            Iviz[j][2] +=  Iij*dz*rinv;
-          }
-        }
-      }
+    const double Q = G0*dV0*dV0 + G1*dV1*dV1;
+    if (std::isfinite(Q) && Q >= 0.0) {
+      qpw[i] = Q;
+      Ppw_loc += Q;
     }
   }
 
-  fix_rhsG->do_reverse_comm();
-  fix_diagFlag->do_reverse_comm();
-  for (int i=0;i<nlocal;++i) qpp_new[i] += ppHalfToJ[i];
-
-  double I0_loc=0.0, I1_loc=0.0, Ppw_loc=0.0;
-
-  for (int i=0;i<nlocal;++i) {
-    const double Gw = GwA[i];
-    if (totalC) totalC[i] = diagPP[i] + (std::isfinite(Gw) ? std::max(0.0,Gw) : 0.0);
-
-    if (!(Gw > epsC) || !std::isfinite(Gw)) continue;
-    double cMi = std::isfinite(cM[i]) ? cM[i] : 0.0;
-
-    const double Vi = V[i];
-    if (!std::isfinite(Vi)) continue;
-
-    double G0=0.0, G1=0.0;
-    if (two_terminal) {
-      const double cLo = Gw*std::min(V0,V1);
-      const double cHi = Gw*std::max(V0,V1);
-      if (cMi < cLo) cMi = cLo;
-      if (cMi > cHi) cMi = cHi;
-
-      const double denom = (std::fabs(dVw) > epsV) ? dVw : (dVw>=0?epsV:-epsV);
-      G1 = (cMi - Gw*V0)/denom;
-      G0 = Gw - G1;
-
-      if (G1 < 0.0) G1 = 0.0;
-      if (G1 > Gw ) G1 = Gw;
-      if (G0 < 0.0) G0 = 0.0;
-      if (G0 > Gw ) G0 = Gw;
-    } else {
-      G0 = Gw; G1 = 0.0;
-    }
-
-    const double I0 = G0*(V0 - Vi);
-    const double I1 = G1*(V1 - Vi);
-    if (std::isfinite(I0)) I0_loc += I0;
-    if (std::isfinite(I1)) I1_loc += I1;
-
-    double Qpw = 0.0;
-    if (two_terminal) {
-      Qpw = G0*(Vi - V0)*(Vi - V0) + G1*(Vi - V1)*(Vi - V1);
-    } else {
-      Qpw = Gw*(Vi - V0)*(Vi - V0);
-    }
-    if (std::isfinite(Qpw) && Qpw >= 0.0) {
-      qpw_new[i] += Qpw;
-      Ppw_loc    += Qpw;
-    }
-  }
-
-  for (int i=0;i<nlocal;++i) {
-    const double q_old = std::isfinite(qj[i]) ? qj[i] : 0.0;
-    const double qpp = qpp_new[i];
-    const double qpw = qpw_new[i];
-    const double qtot = qpp + qpw;
-
-    qj_pp[i] = qpp;
-    qj_pw[i] = qpw;
-    qj[i]    = qtot;
-
+  for (int i = 0; i < nlocal; ++i) {
+    const double qpp_i = std::isfinite(qpp[i]) ? qpp[i] : 0.0;
+    const double qpw_i = std::isfinite(qpw[i]) ? qpw[i] : 0.0;
+    const double qnew  = qpp_i + qpw_i;
+    const double qold  = std::isfinite(qj[i]) ? qj[i] : 0.0;
+    qj[i] = qnew;
     if (first_call && heatSource) {
-      const double dq = qtot - q_old;
+      const double dq = qnew - qold;
       if (std::isfinite(dq)) heatSource[i] += dq;
     }
   }
 
-  double Ppp=0.0, Ppw=0.0, I0=0.0, I1=0.0;
-  MPI_Allreduce(&Ppp_loc,&Ppp,1,MPI_DOUBLE,MPI_SUM,world);
-  MPI_Allreduce(&Ppw_loc,&Ppw,1,MPI_DOUBLE,MPI_SUM,world);
-  MPI_Allreduce(&I0_loc, &I0, 1,MPI_DOUBLE,MPI_SUM,world);
-  MPI_Allreduce(&I1_loc, &I1, 1,MPI_DOUBLE,MPI_SUM,world);
+  double sums_loc[4] = { Ppp_loc, Ppw_loc, I0_loc, I1_loc };
+  double sums_glb[4];
+  MPI_Allreduce(sums_loc, sums_glb, 4, MPI_DOUBLE, MPI_SUM, world);
+  const double Ppp = sums_glb[0], Ppw = sums_glb[1];
+  const double I0  = sums_glb[2], I1  = sums_glb[3];
 
-  const double Idev = std::fabs(I1);
-  for (int i=0;i<nlocal;++i) tot_I[i] = Idev;
-}
+  const double Idev = 0.5*(std::fabs(I0) + std::fabs(I1));
+  double *totI = fix_tot_I->vector_atom;
+  for (int i = 0; i < nlocal; ++i) totI[i] = Idev;
 
-inline double FixHeatGranElectric::aspot_fraction_for_types(int ti, int tj) const {
-  double f = aspot_fraction_global_;
-  if (aspotFrac_) {
-    f = 0.5*(std::max(0.0, aspotFrac_[ti]) + std::max(0.0, aspotFrac_[tj]));
+  if (comm->me == 0 && first_call && screen &&
+      (update->ntimestep % std::max(1, electric_log_stride_) == 0)) {
+    const double Pterm  = V0*I0 + V1*I1;
+    const double Pdiss  = Ppp + Ppw;
+    const double relMis = std::fabs(Pdiss - Pterm)/std::max(1.0e-20, std::fabs(Pdiss));
+    const double kcl    = std::fabs(I0 + I1)/std::max(1.0e-20, Idev);
+    fprintf(screen,"[ELECTRIC] V0=%.4g V1=%.4g I=%.4g (I0=%+.4g I1=%+.4g)  Ppp=%.4g Ppw=%.4g  "
+                   "Pdiss=%.4g Pterm=%.4g  relMis=%.2e  KCL=%.2e\n",
+            V0, V1, Idev, I0, I1, Ppp, Ppw, Pdiss, Pterm, relMis, kcl);
+    fflush(screen);
   }
-  if (f <= 0.0) return 0.0;
-  if (f > 1.0)  return 1.0;
-  return f;
 }
 
-template<int HISTFLAG, int CONTACTAREA>
-void FixHeatGranElectric::detectedComponentsParallel()
+void FixHeatGranElectric::calculateRadiation()
 {
-  const int me     = comm->me;
-  const int nprocs = comm->nprocs;
-
-  const int nlocal = atom->nlocal;
-  tagint   *tag    = atom->tag;
-  int      *type   = atom->type;
-  int      *mask   = atom->mask;
-  const int gb     = groupbit;
-
-  int  *numneigh    = pair_gran->list->numneigh;
-  int **firstneigh  = pair_gran->list->firstneigh;
-  int **firstHist   = (HISTFLAG && pair_gran->listgranhistory)
-                      ? pair_gran->listgranhistory->firstneigh : nullptr;
-
-  double *pwER   = fix_pwER   ? fix_pwER->vector_atom   : nullptr;
-  double *compID = fix_compID ? fix_compID->vector_atom : nullptr;
-
-  if (!compID) error->all(FLERR,"detectedComponentsParallel: compID missing");
-  if (!pwER)   error->all(FLERR,"detectedComponentsParallel: pwER missing");
-
-  for (int i = 0; i < nlocal; ++i) compID[i] = 0.0;
-
-  const double tiny_sigma = 1.0e-30;
-
-  struct Edge { unsigned long long a, b; };
-
-  std::vector<unsigned long long> nodes_local;
-  nodes_local.reserve(nlocal);
-
-  std::vector<Edge> edges_local;
-  edges_local.reserve(8 * std::max(1,nlocal));
-
-  for (int i = 0; i < nlocal; i++) {
-    const int itype = type[i] - 1;
-    if (!(mask[i] & gb)) continue;
-    if (itype >= 0 && e_cond[itype] > tiny_sigma) {
-      nodes_local.push_back((unsigned long long) tag[i]);
-    }
-  }
-
-  const int inum = pair_gran->list->inum;
-  int *ilist     = pair_gran->list->ilist;
-
-  for (int ii = 0; ii < inum; ii++) {
-    const int i = ilist[ii];
-    const int itype = type[i] - 1;
-    if (!(mask[i] & gb)) continue;
-    if (itype < 0 || e_cond[itype] <= tiny_sigma) continue;
-
-    int *jlist = firstneigh[i];
-    const int jnum = numneigh[i];
-
-    for (int jj = 0; jj < jnum; jj++) {
-      const int j = jlist[jj] & NEIGHMASK;
-      if (j == i) continue;
-
-      const int jtype = type[j] - 1;
-      if (!(mask[j] & gb)) continue;
-      if (jtype < 0 || e_cond[jtype] <= tiny_sigma) continue;
-
-      bool unique = true;
-      if (HISTFLAG && firstHist) {
-        unique = (firstHist[i][jj] != 0);
-      } else {
-        const unsigned long long ti = (unsigned long long) tag[i];
-        const unsigned long long tj = (unsigned long long) tag[j];
-        unique = (ti < tj);
-      }
-      if (!unique) continue;
-
-      const double Cij = conductanceLocalIJ<HISTFLAG,CONTACTAREA>(i,j);
-      if (!(Cij > 0.0) || !std::isfinite(Cij)) continue;
-
-      const unsigned long long a = (unsigned long long) tag[i];
-      const unsigned long long b = (unsigned long long) tag[j];
-      if (a == b) continue;
-
-      if (a < b) edges_local.push_back({a,b});
-      else       edges_local.push_back({b,a});
-    }
-  }
-
-  std::vector<int> cnt(nprocs), dsp(nprocs);
-
-  std::vector<unsigned long long> nodes_all;
-  {
-    int nloc_nodes = (int) nodes_local.size();
-    MPI_Allgather(&nloc_nodes,1,MPI_INT,cnt.data(),1,MPI_INT,world);
-    int tot = 0;
-    for (int p = 0; p < nprocs; ++p) { dsp[p] = tot; tot += cnt[p]; }
-    nodes_all.resize(tot);
-
-    MPI_Allgatherv((void*) nodes_local.data(), nloc_nodes, MPI_UNSIGNED_LONG_LONG,
-                   (void*) nodes_all.data(), cnt.data(), dsp.data(),
-                   MPI_UNSIGNED_LONG_LONG, world);
-
-    std::sort(nodes_all.begin(), nodes_all.end());
-    nodes_all.erase(std::unique(nodes_all.begin(), nodes_all.end()), nodes_all.end());
-  }
-  const int N = (int) nodes_all.size();
-
-  std::vector<Edge> E;
-  {
-    std::vector<unsigned long long> edges_flat;
-    edges_flat.reserve(edges_local.size()*2);
-    for (size_t k=0;k<edges_local.size();++k){
-      edges_flat.push_back(edges_local[k].a);
-      edges_flat.push_back(edges_local[k].b);
-    }
-
-    int nloc_edges = (int) edges_flat.size();
-    MPI_Allgather(&nloc_edges,1,MPI_INT,cnt.data(),1,MPI_INT,world);
-    int tot = 0;
-    for (int p=0;p<nprocs;++p){ dsp[p]=tot; tot += cnt[p]; }
-
-    std::vector<unsigned long long> edges_all(tot);
-    MPI_Allgatherv((void*) edges_flat.data(), nloc_edges, MPI_UNSIGNED_LONG_LONG,
-                   (void*) edges_all.data(), cnt.data(), dsp.data(),
-                   MPI_UNSIGNED_LONG_LONG, world);
-
-    E.reserve(edges_all.size()/2);
-    for (size_t k=0;k+1<edges_all.size();k+=2){
-      unsigned long long a = edges_all[k];
-      unsigned long long b = edges_all[k+1];
-      if (a==b) continue;
-      if (a>b) std::swap(a,b);
-      E.push_back({a,b});
-    }
-
-    std::sort(E.begin(),E.end(),[](const Edge& x,const Edge& y){
-      if (x.a<y.a) return true;
-      if (x.a>y.a) return false;
-      return x.b<y.b;
-    });
-    E.erase(std::unique(E.begin(),E.end(),[](const Edge& x,const Edge& y){
-      return x.a==y.a && x.b==y.b;
-    }), E.end());
-  }
-
-  std::unordered_map<unsigned long long,int> idx;
-  idx.reserve((size_t)N*2);
-  for (int i=0;i<N;++i) idx[nodes_all[i]] = i;
-
-  struct DSU {
-    std::vector<int> p,r;
-    explicit DSU(int n): p(n), r(n,0) { for(int i=0;i<n;++i) p[i]=i; }
-    int find(int a){ while(p[a]!=a){ p[a]=p[p[a]]; a=p[a]; } return a; }
-    void unite(int a,int b){
-      a=find(a); b=find(b); if(a==b) return;
-      if(r[a]<r[b]) std::swap(a,b);
-      p[b]=a; if(r[a]==r[b]) r[a]++;
-    }
-  } uf(N);
-
-  for (size_t e=0;e<E.size();++e){
-    const int ia = idx[E[e].a];
-    const int ib = idx[E[e].b];
-    uf.unite(ia,ib);
-  }
-
-  std::vector<unsigned long long> rep_min(N, std::numeric_limits<unsigned long long>::max());
-  std::vector<int> comp_sz(N,0);
-  for (int i=0;i<N;++i){
-    const int r = uf.find(i);
-    rep_min[r] = std::min(rep_min[r], nodes_all[i]);
-    comp_sz[r]++;
-  }
-
-  std::unordered_map<unsigned long long,unsigned long long> tag2rep;
-  tag2rep.reserve((size_t)N*2);
-  for (int i=0;i<N;++i){
-    tag2rep[nodes_all[i]] = rep_min[ uf.find(i) ];
-  }
-
-  std::unordered_set<unsigned long long> wall_touch;
-  {
-    std::unordered_set<unsigned long long> local;
-    local.reserve((size_t)nlocal/2+8);
-
-    for (int i=0;i<nlocal;++i){
-      const int itype = type[i]-1;
-      if (!(mask[i] & gb)) continue;
-      if (itype<0 || e_cond[itype]<=tiny_sigma) continue;
-      if (!(pwER[i] > 0.0)) continue;
-
-      const unsigned long long t = (unsigned long long) tag[i];
-      auto it = tag2rep.find(t);
-      if (it != tag2rep.end()) local.insert(it->second);
-    }
-
-    std::vector<unsigned long long> send(local.begin(), local.end());
-    int nloc_w = (int)send.size();
-    MPI_Allgather(&nloc_w,1,MPI_INT,cnt.data(),1,MPI_INT,world);
-    int tot=0; for(int p=0;p<nprocs;++p){ dsp[p]=tot; tot+=cnt[p]; }
-    std::vector<unsigned long long> recv(tot);
-
-    MPI_Allgatherv((void*)send.data(), nloc_w, MPI_UNSIGNED_LONG_LONG,
-                   (void*)recv.data(), cnt.data(), dsp.data(),
-                   MPI_UNSIGNED_LONG_LONG, world);
-
-    std::sort(recv.begin(), recv.end());
-    recv.erase(std::unique(recv.begin(), recv.end()), recv.end());
-    wall_touch.insert(recv.begin(), recv.end());
-  }
-
-  std::vector<unsigned long long> kept;
-  kept.reserve(N);
-  for (int i=0;i<N;++i){
-    if (rep_min[i] == std::numeric_limits<unsigned long long>::max()) continue;
-    if (comp_sz[i] >= 2 || wall_touch.count(rep_min[i]))
-      kept.push_back(rep_min[i]);
-  }
-  std::sort(kept.begin(), kept.end());
-
-  std::unordered_map<unsigned long long,int> rep2dense;
-  rep2dense.reserve(kept.size()*2);
-  for (int k=0;k<(int)kept.size();++k) rep2dense[kept[k]] = k+1;
-
-  for (int i=0;i<nlocal;++i){
-    const int itype = type[i]-1;
-    if (!(mask[i] & gb) || itype<0 || e_cond[itype]<=tiny_sigma) { compID[i]=0.0; continue; }
-
-    const unsigned long long t = (unsigned long long) tag[i];
-    auto it_rep = tag2rep.find(t);
-    if (it_rep == tag2rep.end()) { compID[i]=0.0; continue; }
-
-    auto it_dense = rep2dense.find(it_rep->second);
-    compID[i] = (it_dense == rep2dense.end()) ? 0.0 : (double) it_dense->second;
-  }
-
-  fix_compID->do_forward_comm();
-}
-
-template<int HISTFLAG, int CONTACTAREA>
-void FixHeatGranElectric::iterativeDomainDecompSolve()
-{
-  if (fix_pwER)    fix_pwER->do_forward_comm();
-  if (fix_cMatrix) fix_cMatrix->do_forward_comm();
-  if (fix_compID)  fix_compID->do_forward_comm();
-  if (fix_pwEP)    fix_pwEP->do_forward_comm();
-  fix_eP->do_forward_comm();
-
-  const int nloc  = atom->nlocal;
-  const int nall  = atom->nlocal + atom->nghost;
-
-  const int inum       = pair_gran->list->inum;
-  int *     ilist      = pair_gran->list->ilist;
-  int *     numneigh   = pair_gran->list->numneigh;
-  int **    firstneigh = pair_gran->list->firstneigh;
-  int **    firstHist  = (HISTFLAG && pair_gran->listgranhistory)
-                         ? pair_gran->listgranhistory->firstneigh : nullptr;
-
-  int   *mask = atom->mask;
-  int   *type = atom->type;
-  tagint*tag  = atom->tag;
-  const int gb = groupbit;
-
-  double *V    = fix_eP->vector_atom;
-  double *Gw   = fix_pwER->vector_atom;
-  double *cM   = fix_cMatrix->vector_atom;
-  double *cid  = fix_compID->vector_atom;
-  double *Vtag = fix_pwEP ? fix_pwEP->vector_atom : nullptr;
-
-  double *sumPP_acc  = fix_rhsG->vector_atom;
-  double *diagPP_acc = fix_diagFlag->vector_atom;
-
-  fix_rhsG->set_all(0.0);
-  fix_diagFlag->set_all(0.0);
-
-  const double OMEGA    = 0.75;
-  const double RTOL_V   = 1e-10;
-  const double ATOL_V   = 1e-14;
-  const double ITOL_REL = 1e-10;
-  const double ITOL_ABS = 1e-12;
-  const int    KMAX     = 500;
-  const double tinyC    = 1e-40;
-  const double tinyD    = 1e-300;
-  const double tinySig  = 1e-30;
-  const double Veps     = 1e-12;
-
-  auto gmax = [&](double l){ double g=l; MPI_Allreduce(&l,&g,1,MPI_DOUBLE,MPI_MAX,world); return g; };
-  auto gsum = [&](double l){ double g=l; MPI_Allreduce(&l,&g,1,MPI_DOUBLE,MPI_SUM,world); return g; };
-
-  int Nc_loc = 0;
-  for (int i=0;i<nloc;++i){
-    if (!(mask[i] & gb)) continue;
-    const int c = (int) llround(cid[i]);
-    Nc_loc = std::max(Nc_loc, c);
-  }
-  int Nc = 0;
-  MPI_Allreduce(&Nc_loc,&Nc,1,MPI_INT,MPI_MAX,world);
-
-  if (Nc == 0) {
-    for (int i=0;i<nloc;++i){ cid[i]=0.0; V[i]=eP0; }
-    fix_compID->do_forward_comm();
-    fix_eP->do_forward_comm();
-    return;
-  }
-
-  std::vector<int>    touch_loc(Nc+1, 0);
-  std::vector<int>    hasEdge_loc(Nc+1,0);
-  std::vector<double> Vmin_loc(Nc+1,  std::numeric_limits<double>::infinity());
-  std::vector<double> Vmax_loc(Nc+1, -std::numeric_limits<double>::infinity());
-
-  for (int i=0;i<nloc;++i){
-    if (!(mask[i] & gb)) continue;
-    const int c = (int) llround(cid[i]);
-    if (c <= 0) continue;
-
-    const int ti = type[i]-1;
-    if (ti<0 || e_cond[ti] <= tinySig) continue;
-
-    const double Gwi = std::isfinite(Gw[i]) ? Gw[i] : 0.0;
-    if (Gwi > tinyC) {
-      touch_loc[c] = 1;
-      if (Vtag) {
-        const double Vw = Vtag[i];
-        if (std::isfinite(Vw)) {
-          Vmin_loc[c] = std::min(Vmin_loc[c], Vw);
-          Vmax_loc[c] = std::max(Vmax_loc[c], Vw);
-        }
-      }
-    }
-  }
-
-  for (int ii=0; ii<inum; ++ii) {
-    const int i = ilist[ii];
-    if (!(mask[i] & gb)) continue;
-
-    const int ti = type[i]-1;
-    if (ti<0 || e_cond[ti] <= tinySig) continue;
-
-    const int c = (int) llround(cid[i]);
-    if (c <= 0) continue;
-
-    int *jlist = firstneigh[i];
-    const int jnum = numneigh[i];
-    for (int jj=0; jj<jnum; ++jj) {
-      const int j = jlist[jj] & NEIGHMASK;
-      if (!(mask[j] & gb)) continue;
-
-      const int tj = type[j]-1;
-      if (tj<0 || e_cond[tj] <= tinySig) continue;
-
-      bool unique = true;
-      if (HISTFLAG && firstHist) unique = (firstHist[i][jj] != 0);
-      else                       unique = ( (unsigned long long)tag[i] < (unsigned long long)tag[j] );
-      if (!unique) continue;
-
-      const double Cij = conductanceLocalIJ<HISTFLAG,CONTACTAREA>(i,j);
-      if (Cij > tinyC && std::isfinite(Cij)) { hasEdge_loc[c] = 1; }
-    }
-  }
-
-  std::vector<int>    touch(Nc+1,0), hasEdge(Nc+1,0);
-  std::vector<double> Vmin(Nc+1,  std::numeric_limits<double>::infinity());
-  std::vector<double> Vmax(Nc+1, -std::numeric_limits<double>::infinity());
-
-  MPI_Allreduce(touch_loc.data(),   touch.data(),   Nc+1, MPI_INT,    MPI_MAX, world);
-  MPI_Allreduce(hasEdge_loc.data(), hasEdge.data(), Nc+1, MPI_INT,    MPI_MAX, world);
-  MPI_Allreduce(Vmin_loc.data(),    Vmin.data(),    Nc+1, MPI_DOUBLE, MPI_MIN, world);
-  MPI_Allreduce(Vmax_loc.data(),    Vmax.data(),    Nc+1, MPI_DOUBLE, MPI_MAX, world);
-
-  std::vector<char>   compSolve(Nc+1,0);
-  std::vector<double> VminC(Nc+1, -std::numeric_limits<double>::infinity());
-  std::vector<double> VmaxC(Nc+1,  std::numeric_limits<double>::infinity());
-
-  for (int c=1;c<=Nc;++c){
-    if (!hasEdge[c]) continue;
-    if (!touch[c])   continue;
-    if (!std::isfinite(Vmin[c]) || !std::isfinite(Vmax[c])) continue;
-
-    if ((Vmax[c] - Vmin[c]) > Veps) {
-      compSolve[c] = 1;
-      VminC[c] = Vmin[c];
-      VmaxC[c] = Vmax[c];
-    } else {
-      compSolve[c] = 0;
-    }
-  }
-
-  std::vector<char> active(nall,0);
-  int nSolveLoc = 0;
-
-  for (int i=0;i<nloc;++i){
-    const int ti = type[i]-1;
-    const int c  = (int) llround(cid[i]);
-
-    if (!(mask[i] & gb) || ti<0 || e_cond[ti] <= tinySig || c<=0) {
-      cid[i]=0.0; V[i]=eP0; active[i]=0; continue;
-    }
-
-    if (!compSolve[c]) {
-      if (touch[c]) {
-        double Vfix = std::numeric_limits<double>::quiet_NaN();
-        if (std::isfinite(Vmin[c])) Vfix = Vmin[c];
-        if (std::isfinite(Vmax[c])) Vfix = Vmax[c];
-        V[i] = std::isfinite(Vfix) ? Vfix : eP0;
-      } else {
-        V[i] = eP0;
-      }
-      cid[i]=0.0;
-      active[i]=0;
-      continue;
-    }
-
-    active[i]=1;
-    ++nSolveLoc;
-
-    if (std::isfinite(VminC[c])) {
-      if (V[i] < VminC[c]) V[i] = VminC[c];
-      if (V[i] > VmaxC[c]) V[i] = VmaxC[c];
-    }
-  }
-
-  int nSolveGlb=0;
-  MPI_Allreduce(&nSolveLoc,&nSolveGlb,1,MPI_INT,MPI_SUM,world);
-
-  fix_compID->do_forward_comm();
-  fix_eP->do_forward_comm();
-
-  for (int i=nloc;i<nall;++i){
-    const int ti = type[i]-1;
-    const int c  = (int) llround(cid[i]);
-    active[i] = ((mask[i] & gb) && ti>=0 && e_cond[ti] > tinySig && c>0) ? 1 : 0;
-  }
-
-  if (nSolveGlb == 0) return;
-
-  for (int ii=0; ii<inum; ++ii) {
-    const int i = ilist[ii];
-    if (!active[i]) continue;
-
-    int *jlist = firstneigh[i];
-    const int jnum = numneigh[i];
-
-    for (int jj=0; jj<jnum; ++jj) {
-      const int j = jlist[jj] & NEIGHMASK;
-      if (!active[j]) continue;
-
-      bool unique = true;
-      if (HISTFLAG && firstHist) unique = (firstHist[i][jj] != 0);
-      else                       unique = ( (unsigned long long)tag[i] < (unsigned long long)tag[j] );
-      if (!unique) continue;
-
-      const double Cij = conductanceLocalIJ<HISTFLAG,CONTACTAREA>(i,j);
-      if (!(Cij > tinyC) || !std::isfinite(Cij)) continue;
-
-      diagPP_acc[i] += Cij;
-      diagPP_acc[j] += Cij;
-    }
-  }
-  fix_diagFlag->do_reverse_comm();
-
-  std::vector<double> diag(nloc,0.0);
-  for (int i=0;i<nloc;++i) if (active[i]) {
-    const double Gwi = std::isfinite(Gw[i]) ? std::max(0.0,Gw[i]) : 0.0;
-    const double dpp = std::isfinite(diagPP_acc[i]) ? diagPP_acc[i] : 0.0;
-    diag[i] = dpp + Gwi;
-    if (diag[i] < tinyD) diag[i] = tinyD;
-  }
-
-  std::vector<double> Vnew(nloc,0.0);
-
-  for (int k=0; k<KMAX; ++k) {
-
-    fix_eP->do_forward_comm();
-
-    fix_rhsG->set_all(0.0);
-
-    for (int ii=0; ii<inum; ++ii) {
-      const int i = ilist[ii];
-      if (!active[i]) continue;
-
-      int *jlist = firstneigh[i];
-      const int jnum = numneigh[i];
-
-      for (int jj=0; jj<jnum; ++jj) {
-        const int j = jlist[jj] & NEIGHMASK;
-        if (!active[j]) continue;
-
-        bool unique = true;
-        if (HISTFLAG && firstHist) unique = (firstHist[i][jj] != 0);
-        else                       unique = ( (unsigned long long)tag[i] < (unsigned long long)tag[j] );
-        if (!unique) continue;
-
-        const double Cij = conductanceLocalIJ<HISTFLAG,CONTACTAREA>(i,j);
-        if (!(Cij > tinyC) || !std::isfinite(Cij)) continue;
-
-        sumPP_acc[i] += Cij * V[j];
-        sumPP_acc[j] += Cij * V[i];
-      }
-    }
-
-    fix_rhsG->do_reverse_comm();
-
-    double du_max_loc = 0.0;
-    double v_max_loc  = 0.0;
-
-    for (int i=0;i<nloc;++i) if (active[i] && cid[i] > 0.0) {
-      const double si  = std::isfinite(sumPP_acc[i]) ? sumPP_acc[i] : 0.0;
-      const double bi  = std::isfinite(cM[i])        ? cM[i]        : 0.0;
-      const double rhs = si + bi;
-
-      const double Vi = V[i];
-      const double Vc = rhs / diag[i];
-      const double Vr = Vi + OMEGA * (Vc - Vi);
-
-      const int c = (int) llround(cid[i]);
-      double Vcl = Vr;
-      if (c > 0 && std::isfinite(VminC[c])) {
-        if (Vcl < VminC[c]) Vcl = VminC[c];
-        if (Vcl > VmaxC[c]) Vcl = VmaxC[c];
-      }
-
-      Vnew[i] = Vcl;
-      du_max_loc = std::max(du_max_loc, std::fabs(Vcl - Vi));
-      v_max_loc  = std::max(v_max_loc,  std::fabs(Vcl));
-    }
-
-    for (int i=0;i<nloc;++i) if (active[i] && cid[i] > 0.0) V[i] = Vnew[i];
-
-    const double g_du = gmax(du_max_loc);
-    const double g_vm = gmax(v_max_loc);
-
-    double rmax_loc=0.0, rsum_loc=0.0;
-    for (int i=0;i<nloc;++i) if (active[i] && cid[i] > 0.0) {
-      const double si = std::isfinite(sumPP_acc[i]) ? sumPP_acc[i] : 0.0;
-      const double bi = std::isfinite(cM[i])        ? cM[i]        : 0.0;
-      const double ri = diag[i]*V[i] - si - bi;
-      const double ar = std::fabs(ri);
-      rmax_loc = std::max(rmax_loc, ar);
-      rsum_loc += ar;
-    }
-
-    const double rmax = gmax(rmax_loc);
-    const double rsum = gsum(rsum_loc);
-    const double rref = std::max(1e-30, rsum);
-
-    const bool convV = (g_du <= std::max(ATOL_V, RTOL_V*std::max(1.0, g_vm)));
-    const bool convI = (rmax <= ITOL_ABS) || ((rmax / rref) <= ITOL_REL);
-    if (convV && convI) break;
-  }
-
-  for (int i=0;i<nloc;++i) if (active[i] && cid[i] > 0.0) {
-    const int c = (int) llround(cid[i]);
-    if (c > 0 && std::isfinite(VminC[c])) {
-      if (V[i] < VminC[c]) V[i] = VminC[c];
-      if (V[i] > VmaxC[c]) V[i] = VmaxC[c];
-    }
-  }
-
-  fix_eP->do_forward_comm();
-}
-
-template<int HISTFLAG, int CONTACTAREA>
-double FixHeatGranElectric::conductanceLocalIJ(const int i, const int j)
-{
-  const int ti = atom->type[i] - 1;
-  const int tj = atom->type[j] - 1;
-
-  const double Ti = Temp[i];
-  const double Tj = Temp[j];
-
-  if (!type_is_conductive(ti) || !type_is_conductive(tj)) return 0.0;
-  const double sigI = sigma_at_typeT(ti, Ti);
-  const double sigJ = sigma_at_typeT(tj, Tj);
-  if (!(sigI > 0.0) || !(sigJ > 0.0)) return 0.0;
-
-  const double *xi = atom->x[i], *xj = atom->x[j];
-  const double ri = atom->radius[i], rj = atom->radius[j];
-
-  const double dx = xj[0]-xi[0], dy = xj[1]-xi[1], dz = xj[2]-xi[2];
-  const double r  = std::sqrt(dx*dx + dy*dy + dz*dz);
-  double delta    = (ri + rj) - r;
-  if (!(delta > 0.0)) return 0.0;
-
-  if (CONTACTAREA == CONDUCTION_CONTACT_AREA_OVERLAP && deltan_ratio_) {
-    delta *= deltan_ratio_[ti][tj];
-    if (!(delta > 0.0)) return 0.0;
-  }
-
-  double a_nom = 0.0;
-  if (CONTACTAREA == CONDUCTION_CONTACT_AREA_OVERLAP) {
-    const double denom = ri + rj;
-    if (!(denom > 0.0)) return 0.0;
-    const double Reff = (ri * rj) / denom;
-    if (!(Reff > 0.0) || !std::isfinite(Reff)) return 0.0;
-
-    a_nom = std::sqrt(delta * Reff);
-
-    const double a_cap = 0.35 * std::min(ri, rj);
-    if (a_nom > a_cap) a_nom = a_cap;
-
-  } else if (CONTACTAREA == CONDUCTION_CONTACT_AREA_CONSTANT) {
-    const double A = fixed_contact_area_;
-    if (!(A > 0.0)) return 0.0;
-    a_nom = std::sqrt(A / M_PI);
-
-  } else {
-    a_nom = std::min(ri, rj);
-  }
-
-  if (!(a_nom > 0.0) || !std::isfinite(a_nom)) return 0.0;
-
-  const double fA = aspot_fraction_for_types(ti, tj);
-  if (!(fA > 0.0) || !std::isfinite(fA)) return 0.0;
-
-  const double a = a_nom * std::sqrt(fA);
-  if (!(a > 0.0) || !std::isfinite(a)) return 0.0;
-
-  const double Ri = 1.0 / (2.0 * a * sigI);
-  const double Rj = 1.0 / (2.0 * a * sigJ);
-  const double R  = Ri + Rj;
-
-  if (!(R > 0.0) || !std::isfinite(R)) return 0.0;
-
-  const double G = 1.0 / R;
-
-  if (!std::isfinite(G) || G < Cmin_branch_) return 0.0;
-  return G;
-}
-
-void FixHeatGranElectric::calculateRadiation(){
-
-  stencilLength = nullptr;
-  binStencildx = nullptr;
-  binStencilmdx = nullptr;
-  binStencildy = nullptr;
-  binStencilmdy = nullptr;
-  binStencildz = nullptr;
-  binStencilmdz = nullptr;
-
   createStencils();
 
-  int i;
-  int ibin;
   int maxBounces = 100;
 
-  double **x;
-  double *radius;
-  int *type;
-  int nlocal, nghost;
-  double *heatFlux;
-
-  double hitEmis;
-  int hitId;
-  int hitBin;
-  double hitp[3];
-  double nextNormal[3];
-
-  double *ci;
-  double flux;
-  double buffer3[3];
-  double d[3];
-  double o[3];
-
-  double areai;
-  double emisi;
-  double radi;
-  double tempi;
-
-  nlocal = atom->nlocal;
-  nghost = atom->nghost;
-  radius = atom->radius;
-  type   = atom->type;
-  x      = atom->x;
-  heatFlux = fix_heatFlux->vector_atom;
+  int nlocal = atom->nlocal;
+  int nghost = atom->nghost;
+  double *radius = atom->radius;
+  int *type = atom->type;
+  double **x = atom->x;
+  double *hf = fix_heatFlux->vector_atom;
   qr = fix_qr->vector_atom;
+
+  int hitId, hitBin, ibin;
+  double hitEmis, flux, areai, emisi, radi, tempi;
+  double hitp[3], nextNormal[3], buffer3[3], d[3], o[3];
+  double *ci;
 
   updatePtrs();
 
-  for (i = 0; i < nlocal + nghost; i++)
+  for (int i = 0; i < nlocal + nghost; i++)
   {
     radi  = radius[i];
     ci    = x[i];
@@ -1971,17 +1665,17 @@ void FixHeatGranElectric::calculateRadiation(){
     flux  = areai * emisi * Sigma * tempi * tempi * tempi * tempi * cg_i;
 
     qr[i] += -flux;
-    heatFlux[i] -= flux;
+    hf[i] -= flux;
 
     randOnSphere(ci, radi, o, buffer3);
     randDir(buffer3, d);
 
     hitId = trace(i, ibin, o, d, buffer3, hitp);
 
-    if (hitId != -1){
+    if (hitId != -1) {
       const double& sendflux = flux;
       hitEmis = emissivity_[type[hitId]-1];
-      heatFlux[hitId] += hitEmis * sendflux;
+      hf[hitId] += hitEmis * sendflux;
       qr[hitId] += hitEmis * sendflux;
 
       hitBin = neighbor->public_coord2bin(x[hitId]);
@@ -1990,9 +1684,8 @@ void FixHeatGranElectric::calculateRadiation(){
       normalize3(buffer3, nextNormal);
 
       reflect(i, hitId, hitBin, hitp, nextNormal, sendflux, 1.0-hitEmis, maxBounces, buffer3);
-
     } else {
-      heatFlux[i] += cg_i * (areai * emisi * Sigma * TB * TB * TB * TB);
+      hf[i] += cg_i * (areai * emisi * Sigma * TB * TB * TB * TB);
     }
   }
 }
@@ -2005,7 +1698,6 @@ void FixHeatGranElectric::randOnSphere(const double *c, double r, double *ansP, 
     ansD[0] = 2.0*RGen->uniform() - 1.0;
     ansD[1] = 2.0*RGen->uniform() - 1.0;
     s = ansD[0]*ansD[0] + ansD[1]*ansD[1];
-
   } while (s > 1.0);
   ansD[2] = 2.0*s - 1.0;
   const double a = 2.0 * sqrt(1.0 - s);
@@ -2015,25 +1707,22 @@ void FixHeatGranElectric::randOnSphere(const double *c, double r, double *ansP, 
   addscaled3(c,ansD,r,ansP);
 }
 
-void FixHeatGranElectric::randDir(const double *n, double *d){
+void FixHeatGranElectric::randDir(const double *n, double *d)
+{
   double s;
-
   do
   {
     d[0] = 2.0*RGen->uniform() - 1.0;
     d[1] = 2.0*RGen->uniform() - 1.0;
     s = d[0]*d[0] + d[1]*d[1];
-
   } while (s > 1.0);
 
   d[2] = 2.0*s - 1.0;
   const double a = 2.0 * sqrt(1.0 - s);
-
   d[0] *= a;
   d[1] *= a;
 
-  const double side = dot3(d, n);
-  if (side < 0.0){
+  if (dot3(d, n) < 0.0) {
     d[0] = -d[0];
     d[1] = -d[1];
     d[2] = -d[2];
@@ -2044,16 +1733,15 @@ int FixHeatGranElectric::trace(int orig_id, int ibin, double *o, double *d, doub
 {
   int *binhead = neighbor->binhead;
   int *bins = neighbor->bins;
-  int stencilbin, stbX, stbY, stbZ;
-  int currX, currY, currZ;
   int sx = neighbor->sx;
   int sy = neighbor->sy;
   int sz = neighbor->sz;
   int mbins = neighbor->mbins;
 
-  double distsq, distx, disty, distz;
+  int stencilbin, stbX, stbY, stbZ;
+  int currX, currY, currZ;
+  double distsq, distx, disty, distz, t;
   bool hit;
-  double t;
 
   bool hitFlag = false;
   double hitT  = 1.0e300;
@@ -2062,43 +1750,50 @@ int FixHeatGranElectric::trace(int orig_id, int ibin, double *o, double *d, doub
   double **x     = atom->x;
   double *radius = atom->radius;
 
-  int i;
-  int currentBin = neighbor->public_coord2bin(o);
-  int dx = 0;
-  int dy = 0;
-  int dz = 0;
-
-  int var_nstencil;
   int *stencil = pair_gran->list->stencil;
   int nstencil = pair_gran->list->nstencil;
   int nstencil2D = 0;
+  int var_nstencil;
 
+  const int nall_atoms = atom->nlocal + atom->nghost;
+  if (!binhead || !bins || mbins <= 0 || nstencil <= 0 || !stencil) {
+    if (comm->me == 0 && screen) {
+      fprintf(screen,"[RAD] bin data unusable (mbins=%d nstencil=%d), radiation ray dropped\n", mbins, nstencil);
+      fflush(screen);
+    }
+    return -1;
+  }
+  if (!stencilLength || !binStencildx || !binStencilmdx ||
+      !binStencildy  || !binStencilmdy || !binStencildz || !binStencilmdz)
+    return -1;
+
+  int currentBin = neighbor->public_coord2bin(o);
+  if (currentBin < 0 || currentBin >= mbins) return -1;
+
+  int dx = 0, dy = 0, dz = 0;
   int *currentStencil = stencil;
-
   bool check_boundary_only = false;
 
-  while ((currentBin != -1) && (hitFlag == false)){
+  while ((currentBin != -1) && (hitFlag == false)) {
 
     var_nstencil = check_boundary_only ? nstencil2D : nstencil;
 
-    for (int k = 0; k < var_nstencil; k++){
-
+    for (int k = 0; k < var_nstencil; k++) {
       stencilbin = currentBin + currentStencil[k];
+      if (stencilbin < 0 || stencilbin >= mbins) continue;
       neighbor->public_bin2XYZ(stencilbin, stbX, stbY, stbZ);
       neighbor->public_bin2XYZ(currentBin, currX, currY, currZ);
-      if (stencilbin < 0 || stencilbin >= mbins || abs(stbX - currX) > sx || abs(stbY - currY) > sy || abs(stbZ - currZ) > sz)
+      if (abs(stbX - currX) > sx || abs(stbY - currY) > sy || abs(stbZ - currZ) > sz)
         continue;
 
-      for (i = binhead[stencilbin]; i >= 0; i = bins[i]){
-
-        if (i == orig_id){
-          continue;
-        }
+      for (int i = binhead[stencilbin]; i >= 0; i = bins[i]) {
+        if (i >= nall_atoms) break;
+        if (i == orig_id) continue;
 
         hit = intersectRaySphere(o, d, x[i], radius[i], t, buffer3);
-        if (hit){
+        if (hit) {
           hitFlag = true;
-          if (t < hitT){
+          if (t < hitT) {
             hitT = t;
             hitId = i;
           }
@@ -2106,90 +1801,62 @@ int FixHeatGranElectric::trace(int orig_id, int ibin, double *o, double *d, doub
       }
     }
 
-    if (hitFlag){
+    if (hitFlag) {
       addscaled3(o,d,hitT,hitp);
       return hitId;
     }
 
     ibin       = currentBin;
     currentBin = nextBin(ibin, o, d, raypoint, dx, dy, dz);
+    if (currentBin < 0 || currentBin >= mbins) return -1;
 
     check_boundary_only = true;
-    if (dx == 1){
-      currentStencil = binStencildx;
-      nstencil2D = stencilLength[0];
-    }
-    else if(dx == -1){
-      currentStencil = binStencilmdx;
-      nstencil2D = stencilLength[3];
-    }
-    else if(dy == 1){
-      currentStencil = binStencildy;
-      nstencil2D = stencilLength[1];
-    }
-    else if(dy == -1){
-      currentStencil = binStencilmdy;
-      nstencil2D = stencilLength[4];
-    }
-    else if(dz == 1){
-      currentStencil = binStencildz;
-      nstencil2D = stencilLength[2];
-    }
-    else{
-      currentStencil = binStencilmdz;
-      nstencil2D = stencilLength[5];
-    }
+    if (dx == 1)       { currentStencil = binStencildx;  nstencil2D = stencilLength[0]; }
+    else if (dx == -1) { currentStencil = binStencilmdx; nstencil2D = stencilLength[3]; }
+    else if (dy == 1)  { currentStencil = binStencildy;  nstencil2D = stencilLength[1]; }
+    else if (dy == -1) { currentStencil = binStencilmdy; nstencil2D = stencilLength[4]; }
+    else if (dz == 1)  { currentStencil = binStencildz;  nstencil2D = stencilLength[2]; }
+    else               { currentStencil = binStencilmdz; nstencil2D = stencilLength[5]; }
 
     distx = raypoint[0] - o[0];
     disty = raypoint[1] - o[1];
     distz = raypoint[2] - o[2];
     distsq = distx*distx + disty*disty + distz*distz;
-    if (distsq >= cutGhostsq){
-      return -1;
-    }
+    if (distsq >= cutGhostsq) return -1;
   }
 
   return -1;
 }
 
-void FixHeatGranElectric::reflect(int radID, int orig_id, int ibin, double *o, double *d,double flux, double accum_eps, int n, double *buffer3)
+void FixHeatGranElectric::reflect(int radID, int orig_id, int ibin, double *o, double *d, double flux,
+                                  double accum_eps, int n, double *buffer3)
 {
   const double influx = flux * accum_eps;
-  if (n == 0){
+  if (n == 0 || accum_eps < 0.001) {
     heatFlux[radID] += influx;
     return;
   }
-  if (accum_eps < 0.001){
-    heatFlux[radID] += influx;
-    return;
-  }
+
   double hitp[3];
-  int hitId;
-  {
-    double dd[3];
-    randDir(d, dd);
+  double dd[3];
+  randDir(d, dd);
+  int hitId = trace(orig_id, ibin, o, dd, buffer3, hitp);
 
-    hitId = trace(orig_id, ibin, o, dd, buffer3, hitp);
-  }
   int *type = atom->type;
-  if (hitId != -1){
+  if (hitId != -1) {
     double **x = atom->x;
-    const double& sendflux = influx;
     const double hitEmis = emissivity_[type[hitId]-1];
-
-    heatFlux[hitId] += hitEmis * sendflux;
+    heatFlux[hitId] += hitEmis * influx;
 
     int hitBin = neighbor->public_coord2bin(x[hitId]);
     double nextNormal[3];
-
     sub3(hitp, x[hitId], nextNormal);
     norm3(nextNormal);
 
     reflect(radID, hitId, hitBin, hitp, nextNormal, flux, (1.0-hitEmis) * accum_eps, n-1, buffer3);
   }
   else {
-    const double *radius = atom->radius;
-    const double radRad  = radius[radID];
+    const double radRad  = atom->radius[radID];
     const double cg_i    = force->cg(atom->type[radID]);
     const double radArea = MY_4PI * radRad * radRad;
     const double radEmis = emissivity_[type[radID]-1];
@@ -2202,88 +1869,59 @@ int FixHeatGranElectric::nextBin(int ibin, const double *o, const double *d, dou
   double s;
   double smax = 0.0;
   double xlo, xhi, ylo, yhi, zlo, zhi;
-  int nextBinId;
 
   dx = dy = dz = 0;
   neighbor->public_binBorders(ibin, xlo, xhi, ylo, yhi, zlo, zhi);
-  if (d[0] != 0.0){
+
+  if (d[0] != 0.0) {
     s = (xlo - o[0]) / d[0];
-    p[0] = o[0] + s*d[0];
-    p[1] = o[1] + s*d[1];
-    p[2] = o[2] + s*d[2];
-    if ((s > smax) && (ylo <= p[1] && p[1] <= yhi) && (zlo <= p[2] && p[2] <= zhi)){
-      smax = s;
-      dy = dz = 0;
-      dx = -1;
+    p[0] = o[0] + s*d[0]; p[1] = o[1] + s*d[1]; p[2] = o[2] + s*d[2];
+    if ((s > smax) && (ylo <= p[1] && p[1] <= yhi) && (zlo <= p[2] && p[2] <= zhi)) {
+      smax = s; dy = dz = 0; dx = -1;
     }
     s = (xhi - o[0]) / d[0];
-    p[0] = o[0] + s*d[0];
-    p[1] = o[1] + s*d[1];
-    p[2] = o[2] + s*d[2];
-    if ((s > smax) && (ylo <= p[1] && p[1] <= yhi) && (zlo <= p[2] && p[2] <= zhi)){
-      smax = s;
-      dy = dz = 0;
-      dx = 1;
+    p[0] = o[0] + s*d[0]; p[1] = o[1] + s*d[1]; p[2] = o[2] + s*d[2];
+    if ((s > smax) && (ylo <= p[1] && p[1] <= yhi) && (zlo <= p[2] && p[2] <= zhi)) {
+      smax = s; dy = dz = 0; dx = 1;
     }
   }
-  if (d[1] != 0.0){
+  if (d[1] != 0.0) {
     s = (ylo - o[1]) / d[1];
-    p[0] = o[0] + s*d[0];
-    p[1] = o[1] + s*d[1];
-    p[2] = o[2] + s*d[2];
-    if ((s > smax) && (xlo <= p[0] && p[0] <= xhi) && (zlo <= p[2] && p[2] <= zhi)){
-      smax = s;
-      dx = dz = 0;
-      dy = -1;
+    p[0] = o[0] + s*d[0]; p[1] = o[1] + s*d[1]; p[2] = o[2] + s*d[2];
+    if ((s > smax) && (xlo <= p[0] && p[0] <= xhi) && (zlo <= p[2] && p[2] <= zhi)) {
+      smax = s; dx = dz = 0; dy = -1;
     }
     s = (yhi - o[1]) / d[1];
-    p[0] = o[0] + s*d[0];
-    p[1] = o[1] + s*d[1];
-    p[2] = o[2] + s*d[2];
-    if ((s > smax) && (xlo <= p[0] && p[0] <= xhi) && (zlo <= p[2] && p[2] <= zhi)){
-      smax = s;
-      dx = dz = 0;
-      dy = 1;
+    p[0] = o[0] + s*d[0]; p[1] = o[1] + s*d[1]; p[2] = o[2] + s*d[2];
+    if ((s > smax) && (xlo <= p[0] && p[0] <= xhi) && (zlo <= p[2] && p[2] <= zhi)) {
+      smax = s; dx = dz = 0; dy = 1;
     }
   }
-  if (d[2] != 0.0){
+  if (d[2] != 0.0) {
     s = (zlo - o[2]) / d[2];
-    p[0] = o[0] + s*d[0];
-    p[1] = o[1] + s*d[1];
-    p[2] = o[2] + s*d[2];
-    if ((s > smax) && (xlo <= p[0] && p[0] <= xhi) && (ylo <= p[1] && p[1] <= yhi)){
-      smax = s;
-      dx = dy = 0;
-      dz = -1;
+    p[0] = o[0] + s*d[0]; p[1] = o[1] + s*d[1]; p[2] = o[2] + s*d[2];
+    if ((s > smax) && (xlo <= p[0] && p[0] <= xhi) && (ylo <= p[1] && p[1] <= yhi)) {
+      smax = s; dx = dy = 0; dz = -1;
     }
     s = (zhi - o[2]) / d[2];
-    p[0] = o[0] + s*d[0];
-    p[1] = o[1] + s*d[1];
-    p[2] = o[2] + s*d[2];
-    if ((s > smax) && (xlo <= p[0] && p[0] <= xhi) && (ylo <= p[1] && p[1] <= yhi)){
-      smax = s;
-      dx = dy = 0;
-      dz = 1;
+    p[0] = o[0] + s*d[0]; p[1] = o[1] + s*d[1]; p[2] = o[2] + s*d[2];
+    if ((s > smax) && (xlo <= p[0] && p[0] <= xhi) && (ylo <= p[1] && p[1] <= yhi)) {
+      smax = s; dx = dy = 0; dz = 1;
     }
   }
   p[0] = o[0] + smax*d[0];
   p[1] = o[1] + smax*d[1];
   p[2] = o[2] + smax*d[2];
-  nextBinId = neighbor->public_binHop(ibin,dx,dy,dz);
-  if (nextBinId != ibin){
-    return nextBinId;
-  }
-  else {
-    error->one(FLERR, "FixHeatGranElectric::nextBin() did not find a suitable next bin.");
-    return -1;
-  }
+
+  int nextBinId = neighbor->public_binHop(ibin,dx,dy,dz);
+  if (nextBinId != ibin) return nextBinId;
+  return -1;
 }
 
-bool FixHeatGranElectric::intersectRaySphere(const double *o, const double *d, const double *center, double radius, double &t, double *buffer3)
+bool FixHeatGranElectric::intersectRaySphere(const double *o, const double *d, const double *center, double radius,
+                                             double &t, double *buffer3)
 {
-  double A, B, C;
-  double discr, q;
-  double t0, t1, ttemp;
+  double A, B, C, discr, q, t0, t1;
   t = 0.0;
   A = lensq3(d);
   sub3(o, center, buffer3);
@@ -2291,28 +1929,16 @@ bool FixHeatGranElectric::intersectRaySphere(const double *o, const double *d, c
   C = lensq3(buffer3) - radius*radius;
   discr = B*B - 4.0*A*C;
 
-  if (discr < 0.0){
-    t = 0.0;
-    return false;
-  }
+  if (discr < 0.0) return false;
 
-  q = 0.0;
-  if (B < 0.0){
-    q = (-B - sqrt(discr)) * 0.5;
-  } else {
-    q = (-B + sqrt(discr)) * 0.5;
-  }
+  if (B < 0.0) q = (-B - sqrt(discr)) * 0.5;
+  else         q = (-B + sqrt(discr)) * 0.5;
 
   t0 = q / A;
   t1 = C / q;
+  if (t0 > t1) std::swap(t0, t1);
 
-  if (t0 > t1){
-    ttemp = t0;
-    t0 = t1;
-    t1 = ttemp;
-  }
-
-  if (t1 <= 0.0){
+  if (t1 <= 0.0) {
     t = 0.0;
     return false;
   }
@@ -2322,8 +1948,7 @@ bool FixHeatGranElectric::intersectRaySphere(const double *o, const double *d, c
 
 void FixHeatGranElectric::createStencils()
 {
-  if(stencilLength == nullptr)
-    stencilLength = new int[6];
+  if (stencilLength == NULL) stencilLength = new int[6];
 
   int mbinx = neighbor->mbinx;
   int mbiny = neighbor->mbiny;
@@ -2332,130 +1957,103 @@ void FixHeatGranElectric::createStencils()
   int sz = neighbor->sz;
   double cutneighmaxsq = neighbor->cutneighmaxsq;
 
-  int n;
-  int i,j,k;
-  int nstencil;
-
+  int i, j, k, nstencil;
   bool hit;
 
-  n = (2*sy+1)*(2*sz+1);
   delete [] binStencildx;
-  binStencildx = new int[n];
+  binStencildx = new int[(2*sy+1)*(2*sz+1)];
   nstencil = 0;
-  for (k = -sz; k <= sz; k++){
-    for (j = -sy; j <= sy; j++){
+  for (k = -sz; k <= sz; k++)
+    for (j = -sy; j <= sy; j++) {
       hit = false;
       i = sx;
-      while (!hit && i >= -sz){
-        if (neighbor->public_bin_distance(i,j,k) < cutneighmaxsq){
+      while (!hit && i >= -sx) {
+        if (neighbor->public_bin_distance(i,j,k) < cutneighmaxsq) {
           binStencildx[nstencil++] = k*mbiny*mbinx + j*mbinx + i;
           hit = true;
-        }
-        else
-          i--;
+        } else i--;
       }
     }
-  }
   stencilLength[0] = nstencil;
 
-  n = (2*sx+1)*(2*sz+1);
   delete [] binStencildy;
-  binStencildy = new int[n];
+  binStencildy = new int[(2*sx+1)*(2*sz+1)];
   nstencil = 0;
-  for (k = -sz; k <= sz; k++){
-    for (i = -sx; i <= sx; i++){
+  for (k = -sz; k <= sz; k++)
+    for (i = -sx; i <= sx; i++) {
       hit = false;
       j = sy;
-      while (!hit && j >= -sy){
-        if (neighbor->public_bin_distance(i,j,k) < cutneighmaxsq){
+      while (!hit && j >= -sy) {
+        if (neighbor->public_bin_distance(i,j,k) < cutneighmaxsq) {
           binStencildy[nstencil++] = k*mbiny*mbinx + j*mbinx + i;
           hit = true;
-        }
-        else
-          j--;
+        } else j--;
       }
     }
-  }
   stencilLength[1] = nstencil;
 
-  n = (2*sx+1)*(2*sy+1);
   delete [] binStencildz;
-  binStencildz = new int[n];
+  binStencildz = new int[(2*sx+1)*(2*sy+1)];
   nstencil = 0;
-  for (j = -sy; j <= sy; j++){
-    for (i = -sx; i <= sx; i++){
+  for (j = -sy; j <= sy; j++)
+    for (i = -sx; i <= sx; i++) {
       hit = false;
       k = sz;
-      while (!hit && k >= -sz){
-        if (neighbor->public_bin_distance(i,j,k) < cutneighmaxsq){
+      while (!hit && k >= -sz) {
+        if (neighbor->public_bin_distance(i,j,k) < cutneighmaxsq) {
           binStencildz[nstencil++] = k*mbiny*mbinx + j*mbinx + i;
           hit = true;
-        }
-        else
-          k--;
+        } else k--;
       }
     }
-  }
   stencilLength[2] = nstencil;
 
-  n = (2*sy+1)*(2*sz+1);
   delete [] binStencilmdx;
-  binStencilmdx = new int[n];
+  binStencilmdx = new int[(2*sy+1)*(2*sz+1)];
   nstencil = 0;
-  for (k = -sz; k <= sz; k++){
-    for (j = -sy; j <= sy; j++){
+  for (k = -sz; k <= sz; k++)
+    for (j = -sy; j <= sy; j++) {
       hit = false;
-      i = -sz;
-      while (!hit && i <= sz){
-        if (neighbor->public_bin_distance(i,j,k) < cutneighmaxsq){
+      i = -sx;
+      while (!hit && i <= sx) {
+        if (neighbor->public_bin_distance(i,j,k) < cutneighmaxsq) {
           binStencilmdx[nstencil++] = k*mbiny*mbinx + j*mbinx + i;
           hit = true;
-        }
-        else
-          i++;
+        } else i++;
       }
     }
-  }
   stencilLength[3] = nstencil;
 
-  n = (2*sx+1)*(2*sz+1);
   delete [] binStencilmdy;
-  binStencilmdy = new int[n];
+  binStencilmdy = new int[(2*sx+1)*(2*sz+1)];
   nstencil = 0;
-  for (k = -sz; k <= sz; k++){
-    for (i = -sx; i <= sx; i++){
+  for (k = -sz; k <= sz; k++)
+    for (i = -sx; i <= sx; i++) {
       hit = false;
       j = -sy;
-      while (!hit && j <= sy){
-        if (neighbor->public_bin_distance(i,j,k) < cutneighmaxsq){
+      while (!hit && j <= sy) {
+        if (neighbor->public_bin_distance(i,j,k) < cutneighmaxsq) {
           binStencilmdy[nstencil++] = k*mbiny*mbinx + j*mbinx + i;
           hit = true;
-        }
-        else
-          j++;
+        } else j++;
       }
     }
-  }
   stencilLength[4] = nstencil;
 
-  n = (2*sx+1)*(2*sy+1);
   delete [] binStencilmdz;
-  binStencilmdz = new int[n];
+  binStencilmdz = new int[(2*sx+1)*(2*sy+1)];
   nstencil = 0;
-  for (j = -sy; j <= sy; j++){
-    for (i = -sx; i <= sx; i++){
+  for (j = -sy; j <= sy; j++)
+    for (i = -sx; i <= sx; i++) {
       hit = false;
       k = -sz;
-      while (!hit && k <= sz){
-        if (neighbor->public_bin_distance(i,j,k) < cutneighmaxsq){
+      while (!hit && k <= sz) {
+        if (neighbor->public_bin_distance(i,j,k) < cutneighmaxsq) {
           binStencilmdz[nstencil++] = k*mbiny*mbinx + j*mbinx + i;
           hit = true;
-        }
-        else
-          k++;
+        } else k++;
       }
     }
-  }
   stencilLength[5] = nstencil;
 }
 
